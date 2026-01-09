@@ -1,41 +1,41 @@
-# Infrastructure - Database (RDS MySQL)
+# Infraestrutura - Banco de Dados (RDS MySQL)
 
-This repository contains Terraform code for provisioning AWS RDS MySQL database infrastructure.
+Este repositório contém código Terraform para provisionar infraestrutura de banco de dados AWS RDS MySQL.
 
-## Resources Provisioned
+## Recursos Provisionados
 
-- **VPC** with public and private subnets
-- **RDS MySQL 8.0** instance with Multi-AZ support
-- **DB Parameter Group** for MySQL performance tuning
-- **DB Subnet Group** for RDS placement
-- **Security Groups** for RDS access control
-- **Secrets Manager** secrets for database credentials:
-  - Master credentials
-  - App user credentials
-  - Migration user credentials
-  - Admin user credentials
-- **IAM Policies** for secret access
-- **CloudWatch Alarms** for monitoring:
-  - CPU utilization
-  - Database connections
-  - Read/Write latency
-  - Free storage space
-  - Freeable memory
-  - Read/Write IOPS
-- **SNS Topic** for alerting (optional, prod only)
+- **VPC** com sub-redes públicas e privadas
+- **Instância RDS MySQL 8.0** com suporte Multi-AZ
+- **Grupo de Parâmetros DB** para ajuste de performance do MySQL
+- **Grupo de Sub-redes DB** para posicionamento do RDS
+- **Security Groups** para controle de acesso ao RDS
+- **Secrets Manager** para credenciais do banco de dados:
+  - Credenciais master
+  - Credenciais do usuário da aplicação
+  - Credenciais do usuário de migração
+  - Credenciais do usuário admin
+- **Políticas IAM** para acesso aos secrets
+- **Alarmes CloudWatch** para monitoramento:
+  - Utilização de CPU
+  - Conexões do banco de dados
+  - Latência de leitura/escrita
+  - Espaço de armazenamento livre
+  - Memória disponível
+  - IOPS de leitura/escrita
+- **Tópico SNS** para alertas (opcional, apenas prod)
 
-## Prerequisites
+## Pré-requisitos
 
 - Terraform >= 1.13.0
-- AWS CLI configured with appropriate credentials
-- S3 bucket for remote state storage
-- DynamoDB table for state locking
+- AWS CLI configurado com credenciais apropriadas
+- Bucket S3 para armazenamento de estado remoto
+- Tabela DynamoDB para bloqueio de estado
 
-## Usage
+## Uso
 
-### 1. Configure Backend
+### 1. Configurar Backend
 
-Edit `backend.tf` to configure your remote state backend:
+Edite `backend.tf` para configurar o backend de estado remoto:
 
 ```hcl
 terraform {
@@ -49,96 +49,96 @@ terraform {
 }
 ```
 
-### 2. Configure Variables
+### 2. Configurar Variáveis
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and update values:
+Copie `terraform.tfvars.example` para `terraform.tfvars` e atualize os valores:
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars` with your specific values.
+Edite `terraform.tfvars` com seus valores específicos.
 
-### 3. Initialize Terraform
+### 3. Inicializar Terraform
 
 ```bash
 terraform init
 ```
 
-### 4. Plan Changes
+### 4. Planejar Mudanças
 
 ```bash
 terraform plan
 ```
 
-### 5. Apply Infrastructure
+### 5. Aplicar Infraestrutura
 
 ```bash
 terraform apply
 ```
 
-### 6. Review Outputs
+### 6. Revisar Outputs
 
-After applying, view outputs:
+Após aplicar, visualize os outputs:
 
 ```bash
 terraform output
 ```
 
-## Configuration
+## Configuração
 
-### Required Variables
+### Variáveis Obrigatórias
 
-- `aws_region` - AWS region for resources
-- `environment` - Environment name (dev, staging, prod)
-- `project_name` - Project name for resource naming
+- `aws_region` - Região AWS para os recursos
+- `environment` - Nome do ambiente (dev, staging, prod)
+- `project_name` - Nome do projeto para nomenclatura de recursos
 
-### Database Configuration
+### Configuração do Banco de Dados
 
-- `db_instance_class` - RDS instance class (default: `db.t3.micro`)
-- `db_allocated_storage` - Initial storage in GB (default: 20)
-- `db_max_allocated_storage` - Max storage for autoscaling (default: 100)
-- `db_backup_retention_period` - Backup retention in days (default: 7)
-- `db_name` - Database name (default: `tech_challenge`)
+- `db_instance_class` - Classe da instância RDS (padrão: `db.t3.micro`)
+- `db_allocated_storage` - Armazenamento inicial em GB (padrão: 20)
+- `db_max_allocated_storage` - Armazenamento máximo para autoscaling (padrão: 100)
+- `db_backup_retention_period` - Período de retenção de backup em dias (padrão: 7)
+- `db_name` - Nome do banco de dados (padrão: `tech_challenge`)
 
-### Security Configuration
+### Configuração de Segurança
 
-- `allowed_security_group_ids` - List of security group IDs allowed to access RDS
-- `allowed_cidr_blocks` - List of CIDR blocks allowed to access RDS
+- `allowed_security_group_ids` - Lista de IDs de security groups permitidos para acessar o RDS
+- `allowed_cidr_blocks` - Lista de blocos CIDR permitidos para acessar o RDS
 
-**Note**: At least one of `allowed_security_group_ids` or `allowed_cidr_blocks` should be provided for RDS access.
+**Nota**: Pelo menos um de `allowed_security_group_ids` ou `allowed_cidr_blocks` deve ser fornecido para acesso ao RDS.
 
-### Monitoring Configuration
+### Configuração de Monitoramento
 
-- `enable_monitoring` - Enable enhanced monitoring (default: `true`)
-- `enable_performance_insights` - Enable Performance Insights (default: `true`)
-- `alert_email` - Email for CloudWatch alerts (optional, prod only)
+- `enable_monitoring` - Habilitar monitoramento aprimorado (padrão: `true`)
+- `enable_performance_insights` - Habilitar Performance Insights (padrão: `true`)
+- `alert_email` - Email para alertas CloudWatch (opcional, apenas prod)
 
 ## Outputs
 
-This module outputs the following values that can be referenced by other infrastructure repos:
+Este módulo retorna os seguintes valores que podem ser referenciados por outros repositórios de infraestrutura:
 
-- `rds_endpoint` - RDS MySQL endpoint
-- `rds_port` - RDS MySQL port (3306)
-- `rds_database_name` - Database name
-- `rds_instance_id` - RDS instance identifier
-- `rds_security_group_id` - RDS security group ID
-- `rds_master_secret_arn` - ARN of master credentials secret
-- `rds_app_secret_arn` - ARN of app user credentials secret
-- `rds_migration_secret_arn` - ARN of migration user credentials secret
-- `rds_admin_secret_arn` - ARN of admin user credentials secret
-- `vpc_id` - VPC ID
-- `private_subnet_ids` - Private subnet IDs
-- `public_subnet_ids` - Public subnet IDs
-- `app_secrets_read_policy_arn` - IAM policy ARN for app secret access
-- `migration_secrets_read_policy_arn` - IAM policy ARN for migration secret access
+- `rds_endpoint` - Endpoint RDS MySQL
+- `rds_port` - Porta RDS MySQL (3306)
+- `rds_database_name` - Nome do banco de dados
+- `rds_instance_id` - Identificador da instância RDS
+- `rds_security_group_id` - ID do security group do RDS
+- `rds_master_secret_arn` - ARN do secret de credenciais master
+- `rds_app_secret_arn` - ARN do secret de credenciais do usuário da aplicação
+- `rds_migration_secret_arn` - ARN do secret de credenciais do usuário de migração
+- `rds_admin_secret_arn` - ARN do secret de credenciais do usuário admin
+- `vpc_id` - ID da VPC
+- `private_subnet_ids` - IDs das sub-redes privadas
+- `public_subnet_ids` - IDs das sub-redes públicas
+- `app_secrets_read_policy_arn` - ARN da política IAM para acesso de leitura aos secrets da aplicação
+- `migration_secrets_read_policy_arn` - ARN da política IAM para acesso de leitura aos secrets de migração
 
-## Integration with Other Repos
+## Integração com Outros Repositórios
 
-### Referencing from infra-k8s
+### Referenciando de infra-k8s
 
 ```hcl
-# In infra-k8s/terraform/main.tf
+# Em infra-k8s/terraform/main.tf
 data "terraform_remote_state" "db" {
   backend = "s3"
   config = {
@@ -148,14 +148,14 @@ data "terraform_remote_state" "db" {
   }
 }
 
-# Use outputs
+# Usar outputs
 locals {
   db_endpoint = data.terraform_remote_state.db.outputs.rds_endpoint
   db_port     = data.terraform_remote_state.db.outputs.rds_port
   db_secret_arn = data.terraform_remote_state.db.outputs.rds_app_secret_arn
 }
 
-# Allow app security group to access RDS
+# Permitir que o security group da aplicação acesse o RDS
 resource "aws_security_group_rule" "app_to_rds" {
   type                     = "ingress"
   from_port                = 3306
@@ -166,74 +166,73 @@ resource "aws_security_group_rule" "app_to_rds" {
 }
 ```
 
-## Database User Setup
+## Configuração de Usuários do Banco de Dados
 
-After provisioning, execute the SQL scripts in `db-scripts/` to create database users:
+Após o provisionamento, execute os scripts SQL em `db-scripts/` para criar usuários do banco de dados:
 
-1. Connect to RDS using master credentials from Secrets Manager
-2. Execute scripts in order:
+1. Conecte-se ao RDS usando as credenciais master do Secrets Manager
+2. Execute os scripts em ordem:
    - `app_user.sql`
    - `migration_user.sql`
    - `admin_user.sql`
 
-**Important**: Replace `CHANGE_ME_IN_SECRETS_MANAGER` with actual passwords from Secrets Manager.
+**Importante**: Substitua `CHANGE_ME_IN_SECRETS_MANAGER` pelas senhas reais do Secrets Manager.
 
-## Security Notes
+## Notas de Segurança
 
-1. **Passwords**: All passwords are generated by Terraform and stored in Secrets Manager
-2. **Access Control**: RDS security group only allows access from specified security groups or CIDR blocks
-3. **Encryption**: RDS storage is encrypted at rest
-4. **Network**: RDS is deployed in private subnets with no public access
-5. **Monitoring**: CloudWatch alarms configured for key metrics
-6. **Backups**: Automated backups enabled with configurable retention
+1. **Senhas**: Todas as senhas são geradas pelo Terraform e armazenadas no Secrets Manager
+2. **Controle de Acesso**: O security group do RDS permite acesso apenas de security groups ou blocos CIDR especificados
+3. **Criptografia**: O armazenamento do RDS é criptografado em repouso
+4. **Rede**: O RDS é implantado em sub-redes privadas sem acesso público
+5. **Monitoramento**: Alarmes CloudWatch configurados para métricas-chave
+6. **Backups**: Backups automatizados habilitados com retenção configurável
 
-## Maintenance
+## Manutenção
 
-### Updating RDS Instance
+### Atualizando Instância RDS
 
-To change instance class or storage:
+Para alterar a classe da instância ou armazenamento:
 
-1. Update variables in `terraform.tfvars`
-2. Run `terraform plan` to review changes
-3. Run `terraform apply` to apply changes
+1. Atualize as variáveis em `terraform.tfvars`
+2. Execute `terraform plan` para revisar as mudanças
+3. Execute `terraform apply` para aplicar as mudanças
 
-**Note**: Some changes (like instance class) may cause downtime.
+**Nota**: Algumas mudanças (como classe da instância) podem causar indisponibilidade.
 
-### Rotating Passwords
+### Rotacionando Senhas
 
-Passwords are stored in Secrets Manager. To rotate:
+As senhas são armazenadas no Secrets Manager. Para rotacionar:
 
-1. Update password in Secrets Manager
-2. Update database user password using SQL
-3. Update application configuration to use new password
+1. Atualize a senha no Secrets Manager
+2. Atualize a senha do usuário do banco de dados usando SQL
+3. Atualize a configuração da aplicação para usar a nova senha
 
-## Troubleshooting
+## Solução de Problemas
 
-### Cannot Connect to RDS
+### Não é Possível Conectar ao RDS
 
-1. Verify security group rules allow access from your IP/security group
-2. Check VPC and subnet configuration
-3. Verify RDS instance is in `available` state
-4. Check CloudWatch logs for connection errors
+1. Verifique se as regras do security group permitem acesso do seu IP/security group
+2. Verifique a configuração da VPC e sub-redes
+3. Verifique se a instância RDS está no estado `available`
+4. Verifique os logs do CloudWatch para erros de conexão
 
-### High CPU/Memory Usage
+### Alto Uso de CPU/Memória
 
-1. Review CloudWatch metrics
-2. Check slow query log
-3. Consider upgrading instance class
-4. Review application query patterns
+1. Revise as métricas do CloudWatch
+2. Verifique o log de consultas lentas
+3. Considere atualizar a classe da instância
+4. Revise os padrões de consulta da aplicação
 
-## Cost Optimization
+## Otimização de Custos
 
-- Use `db.t3.micro` for development
-- Enable storage autoscaling to avoid over-provisioning
-- Set appropriate backup retention periods
-- Use Multi-AZ only for production environments
-- Monitor unused resources and clean up
+- Use `db.t3.micro` para desenvolvimento
+- Habilite autoscaling de armazenamento para evitar superprovisionamento
+- Defina períodos de retenção de backup apropriados
+- Use Multi-AZ apenas para ambientes de produção
+- Monitore recursos não utilizados e faça limpeza
 
-## Support
+## Suporte
 
-For issues or questions, please refer to:
-- [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
-- [Terraform AWS Provider Documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-
+Para problemas ou dúvidas, consulte:
+- [Documentação AWS RDS](https://docs.aws.amazon.com/rds/)
+- [Documentação do Provider AWS do Terraform](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
