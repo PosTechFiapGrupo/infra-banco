@@ -17,7 +17,8 @@ resource "aws_db_parameter_group" "mysql" {
 
   parameter {
     name  = "innodb_log_file_size"
-    value = "128M"
+    value = "134217728"   # 128 MB em bytes
+    apply_method = "pending-reboot"
   }
 
   parameter {

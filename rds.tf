@@ -44,17 +44,26 @@ resource "aws_db_instance" "mysql" {
   # High Availability
   multi_az = true  # Enable multi-AZ for HA
 
-  # Performance Insights
-  performance_insights_enabled    = var.enable_performance_insights
-  performance_insights_retention_period = 7  # days
+  # Performance Insights (muitos tipos/configs não suportam; em dev pode desligar)
+  performance_insights_enabled = var.environment == "prod" ? var.enable_performance_insights : false
+
+  # só setar retention quando PI estiver ligado (evita combinações ruins)
+  performance_insights_retention_period = (
+    var.environment == "prod" && var.enable_performance_insights
+  ) ? 7 : null
+
+
 
   # Monitoring
   monitoring_interval = var.enable_monitoring ? 60 : 0
+  monitoring_role_arn = var.enable_monitoring ? aws_iam_role.rds_enhanced_monitoring.arn : null
+
   enabled_cloudwatch_logs_exports = [
     "error",
     "general",
     "slowquery"
   ]
+
 
   # Parameter group
   parameter_group_name = aws_db_parameter_group.mysql.name
