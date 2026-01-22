@@ -88,3 +88,15 @@ variable "allowed_cidr_blocks" {
   default     = []
 }
 
+variable "vpc_remote_state_bucket" {
+  type = string
+}
+
+variable "vpc_remote_state_key" {
+  type = string
+}
+
+variable "vpc_remote_state_region" {
+  type    = string
+  default = "us-east-1"
+}
