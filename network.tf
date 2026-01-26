@@ -1,8 +1,13 @@
-# Security Group for RDS (na VPC do infra-k8s)
+# =============================================================================
+# Network - RDS (Security Group + Subnet Group)
+# =============================================================================
+
+# Security Group for RDS (na VPC vinda do remote state)
 resource "aws_security_group" "rds" {
-  name        = "${var.project_name}-rds-sg"
+  name        = "${var.project_name}-rds-sg-${var.environment}"
   description = "Security group for RDS MySQL instance"
-  vpc_id      = data.terraform_remote_state.k8s.outputs.vpc_id
+  vpc_id      = local.vpc_id
+
 
   # Allow ingress from specific security groups (passed as variable)
   dynamic "ingress" {
@@ -37,20 +42,23 @@ resource "aws_security_group" "rds" {
   }
 
   tags = {
-    Name        = "${var.project_name}-rds-sg"
+    Name        = "${var.project_name}-rds-sg-${var.environment}"
     Environment = var.environment
     Project     = var.project_name
+    ManagedBy   = "Terraform"
   }
 }
 
-# DB Subnet Group for RDS (subnets privadas vindas do infra-k8s)
+# DB Subnet Group for RDS (subnets privadas vindas do remote state)
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-db-subnet-group"
-  subnet_ids = data.terraform_remote_state.k8s.outputs.private_subnet_ids
+  name       = "${var.project_name}-db-subnet-group-${var.environment}"
+  subnet_ids = local.private_subnet_ids
+
 
   tags = {
-    Name        = "${var.project_name}-db-subnet-group"
+    Name        = "${var.project_name}-db-subnet-group-${var.environment}"
     Environment = var.environment
     Project     = var.project_name
+    ManagedBy   = "Terraform"
   }
 }

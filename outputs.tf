@@ -44,20 +44,6 @@ output "rds_admin_secret_arn" {
   value       = aws_secretsmanager_secret.db_admin_credentials.arn
 }
 
-output "vpc_id" {
-  description = "VPC ID where RDS is deployed"
-  value       = aws_vpc.main.id
-}
-
-output "private_subnet_ids" {
-  description = "Private subnet IDs for RDS"
-  value       = aws_subnet.private[*].id
-}
-
-output "public_subnet_ids" {
-  description = "Public subnet IDs (for reference)"
-  value       = aws_subnet.public[*].id
-}
 
 output "app_secrets_read_policy_arn" {
   description = "ARN of IAM policy for app to read secrets"

@@ -100,3 +100,60 @@ variable "vpc_remote_state_region" {
   type    = string
   default = "us-east-1"
 }
+
+variable "force_disable_deletion_protection" {
+  type    = bool
+  default = true
+}
+
+variable "force_skip_final_snapshot" {
+  type    = bool
+  default = true
+}
+
+variable "final_snapshot_identifier" {
+  type    = string
+  default = ""
+}
+
+variable "use_remote_state" {
+  description = "Se true usa terraform_remote_state, se false usa override manual"
+  type        = bool
+  default     = true
+}
+
+variable "vpc_id_override" {
+  type    = string
+  default = ""
+}
+
+variable "private_subnet_ids_override" {
+  type    = list(string)
+  default = []
+}
+
+variable "vpc_cidr_override" {
+  type    = string
+  default = ""
+}
+
+variable "public_subnet_ids_override" {
+  description = "Lista de subnets públicas para override manual (quando use_remote_state=false)"
+  type        = list(string)
+  default     = []
+}
+
+variable "k8s_remote_state_bucket" {
+  description = "S3 bucket do remote state do k8s-infra"
+  type        = string
+}
+
+variable "k8s_remote_state_key" {
+  description = "Key do remote state do k8s-infra (ex: infra/grupo19/terraform.tfstate)"
+  type        = string
+}
+
+variable "k8s_remote_state_region" {
+  description = "Região do bucket do remote state do k8s-infra"
+  type        = string
+}

@@ -29,3 +29,6 @@ allowed_security_group_ids = []
 allowed_cidr_blocks = []
 # Example: allowed_cidr_blocks = ["10.0.0.0/16"]
 
+vpc_remote_state_bucket = "tech-challenge-tfstate-209757840409-us-east-1-prod-3913db"
+vpc_remote_state_key    = "infra/grupo19/terraform.tfstate"
+vpc_remote_state_region = "us-east-1"
