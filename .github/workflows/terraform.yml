@@ -120,6 +120,7 @@ jobs:
       - name: Terraform plan
         run: |
           terraform plan \
+            -input=false \
             -var-file=terraform.${{ matrix.env }}.tfvars \
             -no-color | tee tfplan-${{ matrix.env }}.txt
         continue-on-error: true
@@ -181,6 +182,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set Terraform non-interactive defaults
+        shell: bash
+        run: |
+          echo "TF_IN_AUTOMATION=true" >> $GITHUB_ENV
+          echo "TF_INPUT=0" >> $GITHUB_ENV
+          echo "TF_CLI_ARGS=-no-color" >> $GITHUB_ENV
+          echo "TF_CLI_ARGS_plan=-no-color -input=false -var-file=terraform.${{ github.event.inputs.environment }}.tfvars" >> $GITHUB_ENV
+          echo "TF_CLI_ARGS_apply=-no-color -input=false -var-file=terraform.${{ github.event.inputs.environment }}.tfvars" >> $GITHUB_ENV
+          echo "TF_CLI_ARGS_import=-no-color -input=false -var-file=terraform.${{ github.event.inputs.environment }}.tfvars" >> $GITHUB_ENV
+
       - name: Check backend inputs (no secret leakage)
         shell: bash
         run: |
@@ -221,7 +232,7 @@ jobs:
             fi
 
             echo "Importing: $addr <- $id"
-            terraform import "$addr" "$id"
+            terraform import -input=false "$addr" "$id"
           }
 
           echo "Resolving SG ID by name in VPC..."
@@ -234,7 +245,6 @@ jobs:
             exit 1
           fi
 
-          # Imports (falha se não existir — que é o correto para PROD quando você marcou adopt=true)
           tf_import "aws_security_group.rds" "$SG_ID"
           tf_import "aws_iam_role.rds_enhanced_monitoring" "${{ env.ADOPT_IAM_ROLE_NAME_PROD }}"
           tf_import "aws_db_parameter_group.mysql" "${{ env.ADOPT_PARAM_GROUP_NAME }}"
@@ -247,14 +257,8 @@ jobs:
 
       - name: Terraform plan
         if: github.event.inputs.mode == 'plan'
-        run: |
-          terraform plan \
-            -var-file=terraform.${{ github.event.inputs.environment }}.tfvars \
-            -no-color
+        run: terraform plan
 
       - name: Terraform apply
         if: github.event.inputs.mode == 'apply'
-        run: |
-          terraform apply \
-            -var-file=terraform.${{ github.event.inputs.environment }}.tfvars \
-            -auto-approve
+        run: terraform apply -auto-approve
