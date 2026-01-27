@@ -96,9 +96,8 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra-db/dev/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TERRAFORM_STATE_LOCK_TABLE }}"
+            -backend-config="key=infra/grupo19/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" 
 
       - name: Terraform Plan - Dev
         id: plan-dev
