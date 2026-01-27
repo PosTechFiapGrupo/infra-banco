@@ -161,7 +161,7 @@ jobs:
           set -euo pipefail
 
           tf_import () {
-            terraform state show "$1" >/dev/null 2>&1 || terraform import -input=false "$1" "$2"
+            terraform state show "$1" >/dev/null 2>&1 || terraform import -input=false -var-file="terraform.${{ github.event.inputs.environment }}.tfvars" "$1" "$2"
           }
 
           SG_ID=$(aws ec2 describe-security-groups \
@@ -192,4 +192,4 @@ jobs:
 
       - name: Terraform apply
         if: github.event.inputs.mode == 'apply'
-        run: terraform apply -auto-approve -input=false -var-file=terraform.${{ matrix.env }}.tfvars
+        run: terraform apply -auto-approve -input=false -var-file="terraform.${{ github.event.inputs.environment }}.tfvars"
