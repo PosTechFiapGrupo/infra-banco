@@ -31,7 +31,12 @@ on:
         options:
           - plan
           - apply
-          - adopt
+      adopt_existing:
+        description: "Importar (adotar) recursos existentes ANTES do apply? (SOMENTE prod)"
+        required: true
+        type: choice
+        options: ["false", "true"]
+        default: "false"
 
 env:
   TF_VERSION: "1.13.0"
@@ -40,11 +45,8 @@ env:
   # Default group for PR plan (PR não tem inputs)
   TF_GROUP_DEFAULT: "grupo19"
 
-  # ======= ADOPTION DEFAULTS (ajuste se seus nomes mudarem) =======
-  # VPC ID (necessário pra resolver o SG por nome)
+  # ======= ADOPTION DEFAULTS (produção) =======
   ADOPT_VPC_ID_PROD: "vpc-0d6e40297ef06fdaf"
-
-  # Nomes conforme seu log
   ADOPT_SG_NAME_PROD: "tech-challenge-rds-sg-prod"
   ADOPT_IAM_ROLE_NAME_PROD: "tech-challenge-rds-enhanced-monitoring-prod"
   ADOPT_PARAM_GROUP_NAME: "tech-challenge-mysql-params"
@@ -116,7 +118,6 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}"
 
       - name: Terraform plan
-        id: plan
         run: |
           terraform plan \
             -var-file=terraform.${{ matrix.env }}.tfvars \
@@ -157,11 +158,12 @@ jobs:
             });
 
   deploy:
-    name: Deploy - ${{ github.event.inputs.environment }} - ${{ github.event.inputs.mode }}
+    name: Deploy - ${{ github.event.inputs.environment }} - ${{ github.event.inputs.mode }} (adopt=${{ github.event.inputs.adopt_existing }})
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     environment:
       name: ${{ github.event.inputs.environment }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -186,6 +188,13 @@ jobs:
           [[ -n "${{ env.AWS_REGION }}" ]] || (echo "AWS_REGION is EMPTY/MISSING" && exit 1)
           [[ -n "${{ github.event.inputs.group }}" ]] || (echo "group input is EMPTY/MISSING" && exit 1)
 
+      - name: Guardrail - adopt only on prod
+        if: github.event.inputs.adopt_existing == 'true' && github.event.inputs.environment != 'prod'
+        shell: bash
+        run: |
+          echo "ERROR: adopt_existing=true só é permitido para environment=prod."
+          exit 1
+
       - name: Terraform init (S3 + lockfile)
         run: |
           terraform init \
@@ -194,50 +203,47 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}"
 
       # =======================
-      # ADOPT MODE (IMPORT)
+      # ADOPT EXISTING (IMPORT) - SOMENTE PROD E QUANDO adopt_existing=true
       # =======================
-      - name: Adopt existing resources (terraform import)
-        if: github.event.inputs.mode == 'adopt'
+      - name: Adopt existing resources (terraform import) - prod
+        if: github.event.inputs.adopt_existing == 'true' && github.event.inputs.environment == 'prod'
         shell: bash
         run: |
           set -euo pipefail
-          ENV="${{ github.event.inputs.environment }}"
 
           tf_import() {
             local addr="$1"
             local id="$2"
+
             if terraform state show "$addr" >/dev/null 2>&1; then
               echo "Already in state: $addr"
               return 0
             fi
+
             echo "Importing: $addr <- $id"
-            terraform import "$addr" "$id" || echo "WARN: import failed (maybe doesn't exist yet): $addr"
+            terraform import "$addr" "$id"
           }
 
-          if [[ "$ENV" == "prod" ]]; then
-            echo "Resolving SG ID by name in VPC..."
-            SG_ID=$(aws ec2 describe-security-groups \
-              --filters "Name=vpc-id,Values=${{ env.ADOPT_VPC_ID_PROD }}" "Name=group-name,Values=${{ env.ADOPT_SG_NAME_PROD }}" \
-              --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)
+          echo "Resolving SG ID by name in VPC..."
+          SG_ID=$(aws ec2 describe-security-groups \
+            --filters "Name=vpc-id,Values=${{ env.ADOPT_VPC_ID_PROD }}" "Name=group-name,Values=${{ env.ADOPT_SG_NAME_PROD }}" \
+            --query "SecurityGroups[0].GroupId" --output text)
 
-            if [[ -n "${SG_ID:-}" && "$SG_ID" != "None" ]]; then
-              tf_import "aws_security_group.rds" "$SG_ID"
-            else
-              echo "WARN: Could not resolve SG ID for name=${{ env.ADOPT_SG_NAME_PROD }}"
-            fi
-
-            tf_import "aws_iam_role.rds_enhanced_monitoring" "${{ env.ADOPT_IAM_ROLE_NAME_PROD }}"
-            tf_import "aws_db_parameter_group.mysql" "${{ env.ADOPT_PARAM_GROUP_NAME }}"
-            tf_import "aws_db_subnet_group.main" "${{ env.ADOPT_DB_SUBNET_GROUP_PROD }}"
-
-            tf_import "aws_secretsmanager_secret.db_master_credentials" "${{ env.ADOPT_SECRET_MASTER }}"
-            tf_import "aws_secretsmanager_secret.db_app_credentials" "${{ env.ADOPT_SECRET_APP }}"
-            tf_import "aws_secretsmanager_secret.db_migration_credentials" "${{ env.ADOPT_SECRET_MIGRATION }}"
-            tf_import "aws_secretsmanager_secret.db_admin_credentials" "${{ env.ADOPT_SECRET_ADMIN }}"
-          else
-            echo "Adopt step wired for prod based on your logs."
-            echo "If you have duplicates in $ENV, replicate imports with the correct names/IDs."
+          if [[ -z "${SG_ID:-}" || "$SG_ID" == "None" ]]; then
+            echo "ERROR: Não consegui resolver SG ID para name=${{ env.ADOPT_SG_NAME_PROD }} na VPC=${{ env.ADOPT_VPC_ID_PROD }}"
+            exit 1
           fi
+
+          # Imports (falha se não existir — que é o correto para PROD quando você marcou adopt=true)
+          tf_import "aws_security_group.rds" "$SG_ID"
+          tf_import "aws_iam_role.rds_enhanced_monitoring" "${{ env.ADOPT_IAM_ROLE_NAME_PROD }}"
+          tf_import "aws_db_parameter_group.mysql" "${{ env.ADOPT_PARAM_GROUP_NAME }}"
+          tf_import "aws_db_subnet_group.main" "${{ env.ADOPT_DB_SUBNET_GROUP_PROD }}"
+
+          tf_import "aws_secretsmanager_secret.db_master_credentials" "${{ env.ADOPT_SECRET_MASTER }}"
+          tf_import "aws_secretsmanager_secret.db_app_credentials" "${{ env.ADOPT_SECRET_APP }}"
+          tf_import "aws_secretsmanager_secret.db_migration_credentials" "${{ env.ADOPT_SECRET_MIGRATION }}"
+          tf_import "aws_secretsmanager_secret.db_admin_credentials" "${{ env.ADOPT_SECRET_ADMIN }}"
 
       - name: Terraform plan
         if: github.event.inputs.mode == 'plan'
@@ -247,7 +253,7 @@ jobs:
             -no-color
 
       - name: Terraform apply
-        if: github.event.inputs.mode == 'apply' || github.event.inputs.mode == 'adopt'
+        if: github.event.inputs.mode == 'apply'
         run: |
           terraform apply \
             -var-file=terraform.${{ github.event.inputs.environment }}.tfvars \
