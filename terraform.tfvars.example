@@ -32,3 +32,7 @@ allowed_cidr_blocks = []
 vpc_remote_state_bucket = "tech-challenge-tfstate-209757840409-us-east-1-prod-3913db"
 vpc_remote_state_key    = "infra/grupo19/terraform.tfstate"
 vpc_remote_state_region = "us-east-1"
+
+k8s_remote_state_bucket = "tech-challenge-tfstate-209757840409-us-east-1-prod-3913db"
+k8s_remote_state_key    = "infra/grupo19/terraform.tfstate"
+k8s_remote_state_region = "us-east-1"

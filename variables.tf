@@ -143,17 +143,30 @@ variable "public_subnet_ids_override" {
   default     = []
 }
 
+# Remote state K8S
 variable "k8s_remote_state_bucket" {
-  description = "S3 bucket do remote state do k8s-infra"
   type        = string
+  description = "Bucket do remote state do k8s-infra"
 }
 
 variable "k8s_remote_state_key" {
-  description = "Key do remote state do k8s-infra (ex: infra/grupo19/terraform.tfstate)"
   type        = string
+  description = "Key do remote state do k8s-infra"
 }
 
 variable "k8s_remote_state_region" {
-  description = "Região do bucket do remote state do k8s-infra"
   type        = string
+  description = "Região do remote state do k8s-infra"
+}
+
+variable "eks_nodes_sg_id_override" {
+  type        = string
+  description = "Override manual do SG dos nodes do EKS"
+  default     = null
+}
+
+variable "eks_cluster_sg_id_override" {
+  description = "Override manual do cluster security group do EKS (caso não use remote state)"
+  type        = string
+  default     = null
 }

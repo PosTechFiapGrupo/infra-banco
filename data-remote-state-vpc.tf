@@ -13,6 +13,20 @@ data "terraform_remote_state" "vpc" {
 }
 
 # =============================================================================
+# Remote State - K8S / EKS
+# =============================================================================
+
+data "terraform_remote_state" "k8s" {
+  backend = "s3"
+
+  config = {
+    bucket = var.k8s_remote_state_bucket
+    key    = var.k8s_remote_state_key
+    region = var.k8s_remote_state_region
+  }
+}
+
+# =============================================================================
 # Locals - VPC (remote state OU override manual)
 # =============================================================================
 
@@ -44,4 +58,35 @@ locals {
     ? try(data.terraform_remote_state.vpc.outputs.public_subnet_ids, [])
     : var.public_subnet_ids_override
   )
+
+  # -------------------------
+  # EKS - SG dos Nodes (o seu SG "criado no Terraform")
+  # -------------------------
+  eks_nodes_sg_id = (
+    var.use_remote_state
+    ? try(data.terraform_remote_state.k8s.outputs.eks_nodes_sg_id, null)
+    : var.eks_nodes_sg_id_override
+  )
+
+   # -------------------------
+  # EKS - Cluster Security Group (pega string mesmo se vier como lista/tuple)
+  # -------------------------
+  eks_cluster_sg_id = (
+    var.use_remote_state
+    ? try(
+        one(data.terraform_remote_state.k8s.outputs.cluster_security_group_id),
+        data.terraform_remote_state.k8s.outputs.cluster_security_group_id
+      )
+    : var.eks_cluster_sg_id_override
+  )
+
+
+  # -------------------------
+  # SGs permitidos no RDS
+  # -------------------------
+  effective_allowed_security_group_ids = distinct(compact(concat(
+    var.allowed_security_group_ids,
+    [local.eks_nodes_sg_id],
+    [local.eks_cluster_sg_id]
+  )))
 }

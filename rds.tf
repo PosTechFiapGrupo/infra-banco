@@ -92,9 +92,9 @@ resource "aws_db_instance" "mysql" {
   final_snapshot_identifier = (
     var.environment == "prod" && !var.force_skip_final_snapshot
     ? coalesce(
-        var.final_snapshot_identifier,
-        "${var.project_name}-final-${formatdate("YYYYMMDD-hhmm", timestamp())}"
-      )
+      var.final_snapshot_identifier,
+      "${var.project_name}-final-${formatdate("YYYYMMDD-hhmm", timestamp())}"
+    )
     : null
   )
 

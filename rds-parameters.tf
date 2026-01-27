@@ -6,24 +6,24 @@ resource "aws_db_parameter_group" "mysql" {
   # Connection settings
   parameter {
     name  = "max_connections"
-    value = "100"  # Adjust based on instance size (db.t3.micro supports up to 87)
+    value = "100" # Adjust based on instance size (db.t3.micro supports up to 87)
   }
 
   # InnoDB settings (for db.t3.micro with 1GB RAM)
   parameter {
     name  = "innodb_buffer_pool_size"
-    value = "{DBInstanceClassMemory*3/4}"  # 75% of RAM
+    value = "{DBInstanceClassMemory*3/4}" # 75% of RAM
   }
 
   parameter {
-    name  = "innodb_log_file_size"
-    value = "134217728"   # 128 MB em bytes
+    name         = "innodb_log_file_size"
+    value        = "134217728" # 128 MB em bytes
     apply_method = "pending-reboot"
   }
 
   parameter {
     name  = "innodb_flush_log_at_trx_commit"
-    value = "2"  # Better performance, safe for RDS with backups
+    value = "2" # Better performance, safe for RDS with backups
   }
 
   # Query cache (disabled in MySQL 8.0, but keeping for reference)
@@ -32,7 +32,7 @@ resource "aws_db_parameter_group" "mysql" {
   # Logging settings for monitoring
   parameter {
     name  = "general_log"
-    value = "0"  # Disable general log (use slow query log instead)
+    value = "0" # Disable general log (use slow query log instead)
   }
 
   parameter {
@@ -42,7 +42,7 @@ resource "aws_db_parameter_group" "mysql" {
 
   parameter {
     name  = "long_query_time"
-    value = "1"  # Log queries taking longer than 1 second
+    value = "1" # Log queries taking longer than 1 second
   }
 
   parameter {

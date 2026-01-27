@@ -1,17 +1,15 @@
 # =============================================================================
-# Network - RDS (Security Group + Subnet Group)
+# Security Group - RDS
 # =============================================================================
 
-# Security Group for RDS (na VPC vinda do remote state)
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-rds-sg-${var.environment}"
   description = "Security group for RDS MySQL instance"
   vpc_id      = local.vpc_id
 
-
-  # Allow ingress from specific security groups (passed as variable)
+  # MySQL a partir dos SGs permitidos (EKS incluso automaticamente)
   dynamic "ingress" {
-    for_each = var.allowed_security_group_ids
+    for_each = local.effective_allowed_security_group_ids
     content {
       description     = "MySQL from allowed security group"
       from_port       = 3306
@@ -21,7 +19,7 @@ resource "aws_security_group" "rds" {
     }
   }
 
-  # Or allow from CIDR blocks (for flexibility)
+  # Opcional: acesso via CIDR
   dynamic "ingress" {
     for_each = var.allowed_cidr_blocks
     content {
@@ -43,20 +41,6 @@ resource "aws_security_group" "rds" {
 
   tags = {
     Name        = "${var.project_name}-rds-sg-${var.environment}"
-    Environment = var.environment
-    Project     = var.project_name
-    ManagedBy   = "Terraform"
-  }
-}
-
-# DB Subnet Group for RDS (subnets privadas vindas do remote state)
-resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-db-subnet-group-${var.environment}"
-  subnet_ids = local.private_subnet_ids
-
-
-  tags = {
-    Name        = "${var.project_name}-db-subnet-group-${var.environment}"
     Environment = var.environment
     Project     = var.project_name
     ManagedBy   = "Terraform"
