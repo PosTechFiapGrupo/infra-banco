@@ -68,15 +68,15 @@ locals {
     : var.eks_nodes_sg_id_override
   )
 
-   # -------------------------
+  # -------------------------
   # EKS - Cluster Security Group (pega string mesmo se vier como lista/tuple)
   # -------------------------
   eks_cluster_sg_id = (
     var.use_remote_state
     ? try(
-        one(data.terraform_remote_state.k8s.outputs.cluster_security_group_id),
-        data.terraform_remote_state.k8s.outputs.cluster_security_group_id
-      )
+      one(data.terraform_remote_state.k8s.outputs.cluster_security_group_id),
+      data.terraform_remote_state.k8s.outputs.cluster_security_group_id
+    )
     : var.eks_cluster_sg_id_override
   )
 
