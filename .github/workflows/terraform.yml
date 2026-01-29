@@ -186,7 +186,7 @@ jobs:
 
             if [ -n "$deleted_date" ]; then
               echo "Secret scheduled for deletion: $secret_name (DeletedDate=$deleted_date). Cancelling..."
-              aws secretsmanager cancel-delete-secret --secret-id "$secret_name" >/dev/null
+              aws secretsmanager restore-secret --secret-id "$secret_name" >/dev/null
               echo "Cancelled deletion: $secret_name"
             else
               echo "Secret active: $secret_name"
