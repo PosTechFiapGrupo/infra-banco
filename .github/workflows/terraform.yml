@@ -4,14 +4,14 @@ on:
   pull_request:
     branches: [main, develop]
     paths:
-      - "**.tf"
-      - "**.tfvars"
+      - "**/*.tf"
+      - "**/*.tfvars"
       - ".github/workflows/terraform.yml"
   push:
     branches: [main, develop]
     paths:
-      - "**.tf"
-      - "**.tfvars"
+      - "**/*.tf"
+      - "**/*.tfvars"
       - ".github/workflows/terraform.yml"
   workflow_dispatch:
     inputs:
@@ -39,7 +39,6 @@ on:
 env:
   TF_VERSION: "1.13.0"
   AWS_REGION: "us-east-1"
-
   TF_GROUP_DEFAULT: "grupo19"
 
   # ===== ADOPT DEFAULTS (PROD) =====
@@ -97,7 +96,6 @@ jobs:
       fail-fast: false
       matrix:
         env: [dev, staging, prod]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -120,42 +118,19 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}"
 
       - name: Terraform plan
-        id: plan
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           terraform plan \
             -input=false \
             -var-file=terraform.${{ matrix.env }}.tfvars \
             -no-color | tee tfplan-${{ matrix.env }}.txt
-          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
-          exit 0
+        continue-on-error: true
 
       - uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ matrix.env }}-txt
           path: tfplan-${{ matrix.env }}.txt
-
-      - name: Comment PR (plan summary)
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const envName = '${{ matrix.env }}';
-            const exitcode = '${{ steps.plan.outputs.exitcode }}';
-            const body =
-`### Terraform plan: \`${envName}\`
-- Exit code: **${exitcode}**
-- Artifact: \`tfplan-${envName}-txt\` (baixe em *Actions > Artifacts*)
-
-> Observação: este plan roda com backend remoto por ambiente.`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body
-            });
 
   deploy:
     name: Deploy - ${{ github.event.inputs.environment }}
@@ -163,7 +138,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     environment:
       name: ${{ github.event.inputs.environment }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -194,7 +168,6 @@ jobs:
             -backend-config="key=infra/${{ github.event.inputs.group }}/${{ github.event.inputs.environment }}/terraform.tfstate" \
             -backend-config="region=${{ env.AWS_REGION }}"
 
-      # ===== FIX: Secrets stuck in ScheduledDeletion =====
       - name: Unschedule deleted Secrets (if any)
         if: github.event.inputs.mode == 'apply'
         shell: bash
@@ -202,22 +175,21 @@ jobs:
           set -euo pipefail
 
           ensure_secret_active () {
-            local secret_name="$1"
+            secret_name="$1"
 
-            if ! aws secretsmanager describe-secret --secret-id "$secret_name" >/tmp/secret.json 2>/dev/null; then
+            if ! aws secretsmanager describe-secret --secret-id "$secret_name" > /tmp/secret.json 2>/dev/null; then
               echo "Secret not found: $secret_name (Terraform will create it)."
               return 0
             fi
 
-            local deleted_date
-            deleted_date=$(jq -r '.DeletedDate // empty' /tmp/secret.json)
+            deleted_date="$(jq -r '.DeletedDate // empty' /tmp/secret.json)"
 
-            if [[ -n "${deleted_date}" ]]; then
-              echo "Secret '$secret_name' scheduled for deletion (DeletedDate=${deleted_date}). Cancelling deletion..."
+            if [ -n "$deleted_date" ]; then
+              echo "Secret scheduled for deletion: $secret_name (DeletedDate=$deleted_date). Cancelling..."
               aws secretsmanager cancel-delete-secret --secret-id "$secret_name" >/dev/null
               echo "Cancelled deletion: $secret_name"
             else
-              echo "Secret '$secret_name' is active."
+              echo "Secret active: $secret_name"
             fi
           }
 
@@ -226,7 +198,6 @@ jobs:
           ensure_secret_active "${{ env.ADOPT_SECRET_MIGRATION }}"
           ensure_secret_active "${{ env.ADOPT_SECRET_ADMIN }}"
 
-      # ===== ADOPT EXISTING (PROD ONLY) =====
       - name: Adopt existing resources (prod)
         if: github.event.inputs.adopt_existing == 'true' && github.event.inputs.environment == 'prod'
         shell: bash
@@ -234,15 +205,15 @@ jobs:
           set -euo pipefail
 
           tf_import () {
-            local addr="$1"
-            local id="$2"
+            addr="$1"
+            id="$2"
 
             if terraform state show "$addr" >/dev/null 2>&1; then
               echo "[SKIP] already in state: $addr"
               return 0
             fi
 
-            if [[ -z "${id}" || "${id}" == "None" || "${id}" == "null" ]]; then
+            if [ -z "$id" ] || [ "$id" = "None" ] || [ "$id" = "null" ]; then
               echo "[WARN] empty id for $addr. Skipping import."
               return 0
             fi
@@ -251,18 +222,17 @@ jobs:
             terraform import -input=false -var-file="terraform.${{ github.event.inputs.environment }}.tfvars" "$addr" "$id"
           }
 
-          # SG ID by VPC+name
-          SG_ID=$(aws ec2 describe-security-groups \
+          SG_ID="$(aws ec2 describe-security-groups \
             --filters "Name=vpc-id,Values=${{ env.ADOPT_VPC_ID_PROD }}" "Name=group-name,Values=${{ env.ADOPT_SG_NAME_PROD }}" \
-            --query "SecurityGroups[0].GroupId" --output text)
+            --query "SecurityGroups[0].GroupId" --output text)"
 
-          APP_POLICY_ARN=$(aws iam list-policies --scope Local \
+          APP_POLICY_ARN="$(aws iam list-policies --scope Local \
             --query "Policies[?PolicyName=='${{ env.ADOPT_IAM_POLICY_APP_SECRETS_READ }}'].Arn | [0]" \
-            --output text)
+            --output text)"
 
-          MIG_POLICY_ARN=$(aws iam list-policies --scope Local \
+          MIG_POLICY_ARN="$(aws iam list-policies --scope Local \
             --query "Policies[?PolicyName=='${{ env.ADOPT_IAM_POLICY_MIGRATION_SECRETS_READ }}'].Arn | [0]" \
-            --output text)
+            --output text)"
 
           tf_import aws_security_group.rds "$SG_ID"
           tf_import aws_db_instance.mysql "${{ env.ADOPT_DB_INSTANCE_ID_PROD }}"
@@ -270,13 +240,11 @@ jobs:
           tf_import aws_db_parameter_group.mysql "${{ env.ADOPT_PARAM_GROUP_NAME }}"
           tf_import aws_db_subnet_group.main "${{ env.ADOPT_DB_SUBNET_GROUP_PROD }}"
 
-          # Secrets (by name)
           tf_import aws_secretsmanager_secret.db_master_credentials "${{ env.ADOPT_SECRET_MASTER }}"
           tf_import aws_secretsmanager_secret.db_app_credentials "${{ env.ADOPT_SECRET_APP }}"
           tf_import aws_secretsmanager_secret.db_migration_credentials "${{ env.ADOPT_SECRET_MIGRATION }}"
           tf_import aws_secretsmanager_secret.db_admin_credentials "${{ env.ADOPT_SECRET_ADMIN }}"
 
-          # Policies (by ARN)
           tf_import aws_iam_policy.app_secrets_read "$APP_POLICY_ARN"
           tf_import aws_iam_policy.migration_secrets_read "$MIG_POLICY_ARN"
 
@@ -284,6 +252,7 @@ jobs:
         if: github.event.inputs.mode == 'plan'
         shell: bash
         run: |
+          set -euo pipefail
           terraform plan \
             -input=false \
             -var-file="terraform.${{ github.event.inputs.environment }}.tfvars" \
@@ -297,7 +266,9 @@ jobs:
 
       - name: Terraform apply
         if: github.event.inputs.mode == 'apply'
+        shell: bash
         run: |
+          set -euo pipefail
           terraform apply \
             -auto-approve \
             -input=false \
