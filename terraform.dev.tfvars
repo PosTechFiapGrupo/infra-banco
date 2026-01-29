@@ -1,23 +1,23 @@
 # AWS Configuration
-aws_region = "us-east-1"
-environment = "dev"
+aws_region   = "us-east-1"
+environment  = "dev"
 project_name = "tech-challenge"
 
 # VPC Configuration
-vpc_cidr = "10.0.0.0/16"
+vpc_cidr           = "10.0.0.0/16"
 availability_zones = ["us-east-1a", "us-east-1b"]
 
 # Database Configuration
-db_instance_class = "db.t3.micro"
-db_allocated_storage = 20
-db_max_allocated_storage = 100
+db_instance_class          = "db.t3.micro"
+db_allocated_storage       = 20
+db_max_allocated_storage   = 100
 db_backup_retention_period = 7
-db_name = "tech_challenge"
+db_name                    = "tech_challenge"
 
 # Monitoring Configuration
-enable_monitoring = true
-enable_performance_insights = true
-alert_email = ""  # Optional for dev
+enable_monitoring           = true
+enable_performance_insights = false
+alert_email                 = "" # Set to email address for prod alerts
 
 # Security Configuration
 # Provide at least one of these for RDS access:
@@ -29,3 +29,10 @@ allowed_security_group_ids = []
 allowed_cidr_blocks = []
 # Example: allowed_cidr_blocks = ["10.0.0.0/16"]
 
+vpc_remote_state_bucket = "tech-challenge-tfstate-209757840409-us-east-1-prod-3913db"
+vpc_remote_state_key    = "infra/grupo19/terraform.tfstate"
+vpc_remote_state_region = "us-east-1"
+
+k8s_remote_state_bucket = "tech-challenge-tfstate-209757840409-us-east-1-prod-3913db"
+k8s_remote_state_key    = "infra/grupo19/terraform.tfstate"
+k8s_remote_state_region = "us-east-1"

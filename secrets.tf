@@ -1,21 +1,21 @@
 # Random password for app user
 resource "random_password" "db_app_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 # Random password for migration user
 resource "random_password" "db_migration_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 # Random password for admin user
 resource "random_password" "db_admin_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
