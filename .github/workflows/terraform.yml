@@ -1,275 +1,234 @@
-name: Terraform CI/CD
+name: Plan/Deploy Production (infra-banco)
 
 on:
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - "**/*.tf"
-      - "**/*.tfvars"
-      - ".github/workflows/terraform.yml"
-  push:
-    branches: [main, develop]
-    paths:
-      - "**/*.tf"
-      - "**/*.tfvars"
-      - ".github/workflows/terraform.yml"
   workflow_dispatch:
     inputs:
-      environment:
-        description: "Environment"
+      action:
+        description: "O que executar?"
         required: true
+        default: "plan"
+        type: choice
+        options: [plan, deploy]
+      deploy_prod:
+        description: "Confirma deploy em produção? (obrigatório para 'deploy')"
+        required: true
+        default: false
+        type: boolean
+      environment:
+        description: "Ambiente"
+        required: true
+        default: "prod"
         type: choice
         options: [dev, staging, prod]
-      group:
-        description: "Grupo / namespace do state (ex: grupo19)"
+      ns:
+        description: "Namespace/pessoa (ex: grupo19)"
         required: true
         default: "grupo19"
-      mode:
-        description: "Mode"
-        required: true
-        type: choice
-        options: [plan, apply]
-      adopt_existing:
-        description: "Importar (adotar) recursos existentes ANTES do apply? (SOMENTE prod)"
-        required: true
-        type: choice
-        options: ["false", "true"]
-        default: "false"
-
-env:
-  TF_VERSION: "1.13.0"
-  AWS_REGION: "us-east-1"
-  TF_GROUP_DEFAULT: "grupo19"
-
-  # ===== ADOPT DEFAULTS (PROD) =====
-  ADOPT_VPC_ID_PROD: "vpc-0d6e40297ef06fdaf"
-  ADOPT_SG_NAME_PROD: "tech-challenge-rds-sg-prod"
-  ADOPT_DB_INSTANCE_ID_PROD: "tech-challenge-mysql-prod"
-
-  ADOPT_IAM_ROLE_NAME_PROD: "tech-challenge-rds-enhanced-monitoring-prod"
-  ADOPT_PARAM_GROUP_NAME: "tech-challenge-mysql-params"
-  ADOPT_DB_SUBNET_GROUP_PROD: "tech-challenge-db-subnet-group-prod"
-
-  ADOPT_SECRET_MASTER: "tech-challenge/rds/mysql/master-credentials"
-  ADOPT_SECRET_APP: "tech-challenge/rds/mysql/app-credentials"
-  ADOPT_SECRET_MIGRATION: "tech-challenge/rds/mysql/migration-credentials"
-  ADOPT_SECRET_ADMIN: "tech-challenge/rds/mysql/admin-credentials"
-
-  ADOPT_IAM_POLICY_APP_SECRETS_READ: "tech-challenge-app-secrets-read"
-  ADOPT_IAM_POLICY_MIGRATION_SECRETS_READ: "tech-challenge-migration-secrets-read"
-
-permissions:
-  contents: read
-  pull-requests: write
-
-concurrency:
-  group: terraform-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+        type: string
 
 jobs:
-  validate:
-    name: Validate Terraform
+  prod:
     runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      TF_DIR: .
+      STATE_PREFIX: state
+      REPO: infra-banco
+
+      # ajuste conforme sua realidade
+      STACK_K8S: infra-k8s
+      STACK_VPC: infra-k8s   # se VPC for separado, troque para infra-vpc
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Terraform fmt
-        run: terraform fmt -check -diff -recursive
-
-      - name: Terraform init (no backend)
-        run: terraform init -backend=false
-
-      - name: Terraform validate
-        run: terraform validate
-
-  plan_pr:
-    name: Plan (PR)
-    runs-on: ubuntu-latest
-    needs: validate
-    if: github.event_name == 'pull_request'
-    strategy:
-      fail-fast: false
-      matrix:
-        env: [dev, staging, prod]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform init
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra/${{ env.TF_GROUP_DEFAULT }}/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}"
-
-      - name: Terraform plan
+      - name: Safety check (deploy)
+        if: ${{ inputs.action == 'deploy' }}
         shell: bash
         run: |
-          set -euo pipefail
-          terraform plan \
-            -input=false \
-            -var-file=terraform.${{ matrix.env }}.tfvars \
-            -no-color | tee tfplan-${{ matrix.env }}.txt
-        continue-on-error: true
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ matrix.env }}-txt
-          path: tfplan-${{ matrix.env }}.txt
-
-  deploy:
-    name: Deploy - ${{ github.event.inputs.environment }}
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    environment:
-      name: ${{ github.event.inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install jq
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y jq
+          if [ "${{ inputs.deploy_prod }}" != "true" ]; then
+            echo "deploy_prod=false → abortando deploy"
+            exit 0
           fi
 
-      - name: Terraform init
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra/${{ github.event.inputs.group }}/${{ github.event.inputs.environment }}/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
-      - name: Unschedule deleted Secrets (if any)
-        if: github.event.inputs.mode == 'apply'
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Resolve tfvars + project/env/region + state keys
+        id: env
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+
+          ENV="${{ inputs.environment }}"
+          NS="${{ inputs.ns }}"
+
+          # escolhe tfvars por ambiente (com fallback)
+          if [ -f "terraform.${ENV}.tfvars" ]; then
+            TFVARS="terraform.${ENV}.tfvars"
+          elif [ -f "terraform.tfvars" ]; then
+            TFVARS="terraform.tfvars"
+          elif [ -f "terraform.tfvars.example" ]; then
+            TFVARS="terraform.tfvars.example"
+          else
+            echo "ERROR: no tfvars found (terraform.${ENV}.tfvars / terraform.tfvars / terraform.tfvars.example)."
+            exit 1
+          fi
+
+          # extrai project/env/region do tfvars (se faltar, usa defaults)
+          get_tfvar() {
+            local key="$1"
+            sed -nE 's/^\s*'"$key"'\s*=\s*"([^"]+)".*$/\1/p' "$TFVARS" | head -n1
+          }
+
+          PROJECT_NAME="$(get_tfvar project_name)"
+          ENV_TFVARS="$(get_tfvar environment)"
+          AWS_REGION_TFV="$(get_tfvar aws_region)"
+
+          # defaults (caso falte no tfvars)
+          : "${PROJECT_NAME:=tech-challenge}"
+          : "${ENV_TFVARS:=${ENV}}"
+          : "${AWS_REGION_TFV:=us-east-1}"
+
+          # state do stack atual (infra-banco)
+          STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.REPO }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+
+          # remote states
+          VPC_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_VPC }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+          K8S_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_K8S }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+
+          echo "tfvars=${TFVARS}" >> "$GITHUB_OUTPUT"
+          echo "project_name=${PROJECT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "environment=${ENV_TFVARS}" >> "$GITHUB_OUTPUT"
+          echo "aws_region=${AWS_REGION_TFV}" >> "$GITHUB_OUTPUT"
+          echo "ns=${NS}" >> "$GITHUB_OUTPUT"
+          echo "state_key=${STATE_KEY}" >> "$GITHUB_OUTPUT"
+          echo "vpc_state_key=${VPC_STATE_KEY}" >> "$GITHUB_OUTPUT"
+          echo "k8s_state_key=${K8S_STATE_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Discover backend (bucket + lock table) via AWS
+        id: backend
         shell: bash
         run: |
           set -euo pipefail
 
-          ensure_secret_active () {
-            secret_name="$1"
+          PROJECT="${{ steps.env.outputs.project_name }}"
+          ENVIRONMENT="${{ steps.env.outputs.environment }}"
+          REGION="${{ steps.env.outputs.aws_region }}"
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 
-            if ! aws secretsmanager describe-secret --secret-id "$secret_name" > /tmp/secret.json 2>/dev/null; then
-              echo "Secret not found: $secret_name (Terraform will create it)."
-              return 0
-            fi
+          PREFIX="${PROJECT}-tfstate-${ACCOUNT_ID}-${REGION}-${ENVIRONMENT}-"
 
-            deleted_date="$(jq -r '.DeletedDate // empty' /tmp/secret.json)"
+          BUCKET="$(aws s3api list-buckets \
+            --query "Buckets[?starts_with(Name, \`${PREFIX}\`)].Name | sort(@) | [-1]" \
+            --output text)"
 
-            if [ -n "$deleted_date" ]; then
-              echo "Secret scheduled for deletion: $secret_name (DeletedDate=$deleted_date). Cancelling..."
-              aws secretsmanager restore-secret --secret-id "$secret_name" >/dev/null
-              echo "Cancelled deletion: $secret_name"
-            else
-              echo "Secret active: $secret_name"
-            fi
-          }
+          if [ -z "${BUCKET}" ] || [ "${BUCKET}" = "None" ]; then
+            echo "ERROR: Não achei bucket de state com prefixo: ${PREFIX}"
+            aws s3api list-buckets --query "Buckets[].Name" --output text | tr '\t' '\n' | grep -E "${PROJECT}-tfstate-${ACCOUNT_ID}-${REGION}-${ENVIRONMENT}" || true
+            exit 1
+          fi
 
-          ensure_secret_active "${{ env.ADOPT_SECRET_MASTER }}"
-          ensure_secret_active "${{ env.ADOPT_SECRET_APP }}"
-          ensure_secret_active "${{ env.ADOPT_SECRET_MIGRATION }}"
-          ensure_secret_active "${{ env.ADOPT_SECRET_ADMIN }}"
+          LOCK_TABLE="${PROJECT}-terraform-locks-${ACCOUNT_ID}-${REGION}-${ENVIRONMENT}"
 
-      - name: Adopt existing resources (prod)
-        if: github.event.inputs.adopt_existing == 'true' && github.event.inputs.environment == 'prod'
+          {
+            echo "bucket=${BUCKET}"
+            echo "lock_table=${LOCK_TABLE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Export TF_VAR remote states (VPC + K8s)
         shell: bash
         run: |
           set -euo pipefail
+          BUCKET="${{ steps.backend.outputs.bucket }}"
+          REGION="${{ steps.env.outputs.aws_region }}"
 
-          tf_import () {
-            addr="$1"
-            id="$2"
+          echo "TF_VAR_use_remote_state=true" >> "$GITHUB_ENV"
 
-            if terraform state show "$addr" >/dev/null 2>&1; then
-              echo "[SKIP] already in state: $addr"
-              return 0
-            fi
+          echo "TF_VAR_vpc_remote_state_bucket=${BUCKET}" >> "$GITHUB_ENV"
+          echo "TF_VAR_vpc_remote_state_key=${{ steps.env.outputs.vpc_state_key }}" >> "$GITHUB_ENV"
+          echo "TF_VAR_vpc_remote_state_region=${REGION}" >> "$GITHUB_ENV"
 
-            if [ -z "$id" ] || [ "$id" = "None" ] || [ "$id" = "null" ]; then
-              echo "[WARN] empty id for $addr. Skipping import."
-              return 0
-            fi
+          echo "TF_VAR_k8s_remote_state_bucket=${BUCKET}" >> "$GITHUB_ENV"
+          echo "TF_VAR_k8s_remote_state_key=${{ steps.env.outputs.k8s_state_key }}" >> "$GITHUB_ENV"
+          echo "TF_VAR_k8s_remote_state_region=${REGION}" >> "$GITHUB_ENV"
 
-            echo "[IMPORT] $addr <= $id"
-            terraform import -input=false -var-file="terraform.${{ github.event.inputs.environment }}.tfvars" "$addr" "$id"
-          }
-
-          SG_ID="$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=${{ env.ADOPT_VPC_ID_PROD }}" "Name=group-name,Values=${{ env.ADOPT_SG_NAME_PROD }}" \
-            --query "SecurityGroups[0].GroupId" --output text)"
-
-          APP_POLICY_ARN="$(aws iam list-policies --scope Local \
-            --query "Policies[?PolicyName=='${{ env.ADOPT_IAM_POLICY_APP_SECRETS_READ }}'].Arn | [0]" \
-            --output text)"
-
-          MIG_POLICY_ARN="$(aws iam list-policies --scope Local \
-            --query "Policies[?PolicyName=='${{ env.ADOPT_IAM_POLICY_MIGRATION_SECRETS_READ }}'].Arn | [0]" \
-            --output text)"
-
-          tf_import aws_security_group.rds "$SG_ID"
-          tf_import aws_db_instance.mysql "${{ env.ADOPT_DB_INSTANCE_ID_PROD }}"
-          tf_import aws_iam_role.rds_enhanced_monitoring "${{ env.ADOPT_IAM_ROLE_NAME_PROD }}"
-          tf_import aws_db_parameter_group.mysql "${{ env.ADOPT_PARAM_GROUP_NAME }}"
-          tf_import aws_db_subnet_group.main "${{ env.ADOPT_DB_SUBNET_GROUP_PROD }}"
-
-          tf_import aws_secretsmanager_secret.db_master_credentials "${{ env.ADOPT_SECRET_MASTER }}"
-          tf_import aws_secretsmanager_secret.db_app_credentials "${{ env.ADOPT_SECRET_APP }}"
-          tf_import aws_secretsmanager_secret.db_migration_credentials "${{ env.ADOPT_SECRET_MIGRATION }}"
-          tf_import aws_secretsmanager_secret.db_admin_credentials "${{ env.ADOPT_SECRET_ADMIN }}"
-
-          tf_import aws_iam_policy.app_secrets_read "$APP_POLICY_ARN"
-          tf_import aws_iam_policy.migration_secrets_read "$MIG_POLICY_ARN"
-
-      - name: Terraform plan (dispatch)
-        if: github.event.inputs.mode == 'plan'
+      - name: Sanity check remote states exist (S3 head-object)
         shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${{ steps.backend.outputs.bucket }}"
+
+          echo "Checking VPC state: s3://${BUCKET}/${{ steps.env.outputs.vpc_state_key }}"
+          aws s3api head-object --bucket "${BUCKET}" --key "${{ steps.env.outputs.vpc_state_key }}" >/dev/null
+
+          echo "Checking K8s state: s3://${BUCKET}/${{ steps.env.outputs.k8s_state_key }}"
+          aws s3api head-object --bucket "${BUCKET}" --key "${{ steps.env.outputs.k8s_state_key }}" >/dev/null
+
+      - name: Terraform init (remote backend)
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${{ steps.backend.outputs.bucket }}" \
+            -backend-config="key=${{ steps.env.outputs.state_key }}" \
+            -backend-config="region=${{ steps.env.outputs.aws_region }}" \
+            -backend-config="dynamodb_table=${{ steps.backend.outputs.lock_table }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Terraform validate
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform validate -no-color
+
+      - name: Debug remote_state outputs keys (fail-fast)
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          terraform console -var-file="${{ steps.env.outputs.tfvars }}" <<< 'keys(data.terraform_remote_state.k8s.outputs)'
+
+      - name: Terraform plan (gera arquivo + texto)
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
           terraform plan \
+            -var-file="${{ steps.env.outputs.tfvars }}" \
             -input=false \
-            -var-file="terraform.${{ github.event.inputs.environment }}.tfvars" \
-            -no-color | tee tfplan-dispatch-${{ github.event.inputs.environment }}.txt
+            -no-color \
+            -out=tfplan
 
-      - uses: actions/upload-artifact@v4
-        if: github.event.inputs.mode == 'plan'
+          terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload plan artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: tfplan-dispatch-${{ github.event.inputs.environment }}-txt
-          path: tfplan-dispatch-${{ github.event.inputs.environment }}.txt
+          name: tfplan-${{ steps.env.outputs.environment }}-${{ steps.env.outputs.ns }}-${{ env.REPO }}
+          path: |
+            tfplan
+            tfplan.txt
 
-      - name: Terraform apply
-        if: github.event.inputs.mode == 'apply'
+      - name: Terraform apply (deploy)
+        if: ${{ inputs.action == 'deploy' }}
         shell: bash
+        working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
           terraform apply \
-            -auto-approve \
+            -var-file="${{ steps.env.outputs.tfvars }}" \
             -input=false \
-            -var-file="terraform.${{ github.event.inputs.environment }}.tfvars"
+            -auto-approve \
+            -no-color
