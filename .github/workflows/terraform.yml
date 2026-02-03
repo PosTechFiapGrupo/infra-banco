@@ -193,33 +193,67 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform validate -no-color
 
-      - name: Debug remote_state outputs keys (fail-fast)
+      - name: Fail-fast: remote_state k8s must have outputs + expected keys
         shell: bash
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
-          terraform console -var-file="${{ steps.env.outputs.tfvars }}" <<< 'keys(data.terraform_remote_state.k8s.outputs)'
 
-      - name: Terraform plan (gera arquivo + texto)
+          # lista outputs do remote state
+          terraform console -var-file="${{ steps.env.outputs.tfvars }}" <<< 'keys(data.terraform_remote_state.k8s.outputs)' > k8s_outputs_keys.txt || true
+          cat k8s_outputs_keys.txt
+
+          # valida que não está vazio
+          if grep -q '^\[\s*\]$' k8s_outputs_keys.txt; then
+            echo "ERROR: k8s remote_state outputs is empty. Check k8s_remote_state_key/bucket/region."
+            exit 1
+          fi
+
+          # valida que existe pelo menos um dos outputs que você usa
+          # (ajuste se seu infra-k8s exporta nomes diferentes)
+          if ! grep -Eq 'cluster_security_group_id|eks_nodes_sg_id' k8s_outputs_keys.txt; then
+            echo "ERROR: Expected outputs not found in k8s state (cluster_security_group_id or eks_nodes_sg_id)."
+            echo "Fix: export these outputs in infra-k8s or update infra-banco locals to the real output names."
+            exit 1
+          fi
+
+      - name: Terraform plan (gera arquivo + texto) - detailed exit codes
+        id: plan
         shell: bash
         working-directory: ${{ env.TF_DIR }}
         run: |
           set -euo pipefail
+
+          set +e
           terraform plan \
             -var-file="${{ steps.env.outputs.tfvars }}" \
             -input=false \
             -no-color \
+            -detailed-exitcode \
             -out=tfplan
+          code=$?
+          set -e
+
+          if [ "$code" -eq 1 ]; then
+            echo "terraform plan failed (exit 1)"
+            exit 1
+          elif [ "$code" -eq 2 ]; then
+            echo "Plan has changes (exit 2) — continuing"
+          else
+            echo "Plan has no changes (exit 0)"
+          fi
 
           terraform show -no-color tfplan > tfplan.txt
 
       - name: Upload plan artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ steps.env.outputs.environment }}-${{ steps.env.outputs.ns }}-${{ env.REPO }}
           path: |
             tfplan
             tfplan.txt
+            k8s_outputs_keys.txt
 
       - name: Terraform apply (deploy)
         if: ${{ inputs.action == 'deploy' }}
