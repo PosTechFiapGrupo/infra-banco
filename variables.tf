@@ -88,3 +88,85 @@ variable "allowed_cidr_blocks" {
   default     = []
 }
 
+variable "vpc_remote_state_bucket" {
+  type = string
+}
+
+variable "vpc_remote_state_key" {
+  type = string
+}
+
+variable "vpc_remote_state_region" {
+  type    = string
+  default = "us-east-1"
+}
+
+variable "force_disable_deletion_protection" {
+  type    = bool
+  default = true
+}
+
+variable "force_skip_final_snapshot" {
+  type    = bool
+  default = true
+}
+
+variable "final_snapshot_identifier" {
+  type    = string
+  default = ""
+}
+
+variable "use_remote_state" {
+  description = "Se true usa terraform_remote_state, se false usa override manual"
+  type        = bool
+  default     = true
+}
+
+variable "vpc_id_override" {
+  type    = string
+  default = ""
+}
+
+variable "private_subnet_ids_override" {
+  type    = list(string)
+  default = []
+}
+
+variable "vpc_cidr_override" {
+  type    = string
+  default = ""
+}
+
+variable "public_subnet_ids_override" {
+  description = "Lista de subnets públicas para override manual (quando use_remote_state=false)"
+  type        = list(string)
+  default     = []
+}
+
+# Remote state K8S
+variable "k8s_remote_state_bucket" {
+  type        = string
+  description = "Bucket do remote state do k8s-infra"
+}
+
+variable "k8s_remote_state_key" {
+  type        = string
+  description = "Key do remote state do k8s-infra"
+}
+
+variable "k8s_remote_state_region" {
+  type        = string
+  description = "Região do remote state do k8s-infra"
+}
+
+variable "eks_nodes_sg_id_override" {
+  type        = string
+  description = "Override manual do SG dos nodes do EKS"
+  default     = null
+}
+
+variable "eks_cluster_sg_id_override" {
+  description = "Override manual do cluster security group do EKS (caso não use remote state)"
+  type        = string
+  default     = null
+}

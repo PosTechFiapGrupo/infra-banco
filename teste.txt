@@ -1,0 +1,766 @@
+[0m[1mdata.terraform_remote_state.vpc: Reading...[0m[0m
+[0m[1mrandom_password.db_master_password: Refreshing state... [id=none][0m
+[0m[1mdata.aws_iam_policy_document.rds_monitoring_assume: Reading...[0m[0m
+[0m[1maws_db_parameter_group.mysql: Refreshing state... [id=tech-challenge-mysql-params][0m
+[0m[1mdata.aws_iam_policy_document.rds_monitoring_assume: Read complete after 0s [id=76086537][0m
+[0m[1maws_iam_role.rds_enhanced_monitoring: Refreshing state... [id=tech-challenge-rds-enhanced-monitoring-dev][0m
+[0m[1mdata.terraform_remote_state.vpc: Read complete after 2s[0m
+[0m[1maws_security_group.rds: Refreshing state... [id=sg-007c1de209dbd1956][0m
+[0m[1maws_db_subnet_group.main: Refreshing state... [id=tech-challenge-db-subnet-group][0m
+[0m[1maws_db_instance.mysql: Refreshing state... [id=db-H2XXLS3HF5KKNOHPVJRGDKE2ZE][0m
+
+[1m[36mNote:[0m[1m Objects have changed outside of Terraform
+[0m
+Terraform detected the following changes made outside of Terraform since the
+last "terraform apply" which may have affected this plan:
+
+[1m  # aws_db_instance.mysql[0m has been deleted
+[0m  [31m-[0m[0m resource "aws_db_instance" "mysql" {
+      [31m-[0m[0m address                               = "tech-challenge-mysql-dev.cm9w2sswmrzo.us-east-1.rds.amazonaws.com" [90m-> null[0m[0m
+      [31m-[0m[0m db_name                               = "tech_challenge" [90m-> null[0m[0m
+      [31m-[0m[0m id                                    = "db-H2XXLS3HF5KKNOHPVJRGDKE2ZE" [90m-> null[0m[0m
+      [31m-[0m[0m password_wo                           = (write-only attribute) [90m-> null[0m[0m
+      [31m-[0m[0m port                                  = 3306 [90m-> null[0m[0m
+        tags                                  = {
+            "Environment" = "dev"
+            "ManagedBy"   = "Terraform"
+            "Name"        = "tech-challenge-mysql-dev"
+            "Project"     = "tech-challenge"
+        }
+      [31m-[0m[0m username                              = "admin" [90m-> null[0m[0m
+        [90m# (69 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_security_group.rds[0m has been deleted
+[0m  [31m-[0m[0m resource "aws_security_group" "rds" {
+      [31m-[0m[0m id                     = "sg-007c1de209dbd1956" [90m-> null[0m[0m
+        name                   = "tech-challenge-rds-sg"
+        tags                   = {
+            "Environment" = "dev"
+            "Name"        = "tech-challenge-rds-sg"
+            "Project"     = "tech-challenge"
+        }
+        [90m# (9 unchanged attributes hidden)[0m[0m
+    }
+
+
+Unless you have made equivalent changes to your configuration, or ignored the
+relevant attributes using ignore_changes, the following plan may include
+actions to undo or respond to these changes.
+[90m
+─────────────────────────────────────────────────────────────────────────────[0m
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  [32m+[0m create[0m
+  [33m~[0m update in-place[0m
+[31m-[0m/[32m+[0m destroy and then create replacement[0m
+
+Terraform will perform the following actions:
+
+[1m  # aws_cloudwatch_metric_alarm.rds_cpu_utilization[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS CPU utilization"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-cpu-utilization-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "GreaterThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "CPUUtilization"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-cpu-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-cpu-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 80
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_database_connections[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_database_connections" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS database connections"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-database-connections-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "GreaterThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "DatabaseConnections"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-connections-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-connections-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 80
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_free_storage_space[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_free_storage_space" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS free storage space"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-free-storage-space-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "LessThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "FreeStorageSpace"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-storage-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-storage-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 5000000000
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_freeable_memory[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_freeable_memory" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS freeable memory"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-freeable-memory-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "LessThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "FreeableMemory"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-memory-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-memory-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 100000000
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_read_iops[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_read_iops" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS read IOPS"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-read-iops-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "GreaterThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "ReadIOPS"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-read-iops-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-read-iops-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 1000
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_read_latency[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_read_latency" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS read latency"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-read-latency-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "GreaterThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "ReadLatency"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-read-latency-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-read-latency-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 0.5
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_write_iops[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_write_iops" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS write IOPS"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-write-iops-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "GreaterThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "WriteIOPS"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-write-iops-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-write-iops-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 1000
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_cloudwatch_metric_alarm.rds_write_latency[0][0m will be created
+[0m  [32m+[0m[0m resource "aws_cloudwatch_metric_alarm" "rds_write_latency" {
+      [32m+[0m[0m actions_enabled                       = true
+      [32m+[0m[0m alarm_description                     = "This metric monitors RDS write latency"
+      [32m+[0m[0m alarm_name                            = "tech-challenge-rds-write-latency-prod"
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m comparison_operator                   = "GreaterThanThreshold"
+      [32m+[0m[0m dimensions                            = (known after apply)
+      [32m+[0m[0m evaluate_low_sample_count_percentiles = (known after apply)
+      [32m+[0m[0m evaluation_periods                    = 2
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m metric_name                           = "WriteLatency"
+      [32m+[0m[0m namespace                             = "AWS/RDS"
+      [32m+[0m[0m period                                = 300
+      [32m+[0m[0m statistic                             = "Average"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-write-latency-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-write-latency-alarm"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m threshold                             = 0.5
+      [32m+[0m[0m treat_missing_data                    = "notBreaching"
+    }
+
+[1m  # aws_db_instance.mysql[0m will be created
+[0m  [32m+[0m[0m resource "aws_db_instance" "mysql" {
+      [32m+[0m[0m address                               = (known after apply)
+      [32m+[0m[0m allocated_storage                     = 20
+      [32m+[0m[0m allow_major_version_upgrade           = false
+      [32m+[0m[0m apply_immediately                     = false
+      [32m+[0m[0m arn                                   = (known after apply)
+      [32m+[0m[0m auto_minor_version_upgrade            = true
+      [32m+[0m[0m availability_zone                     = (known after apply)
+      [32m+[0m[0m backup_retention_period               = 7
+      [32m+[0m[0m backup_target                         = (known after apply)
+      [32m+[0m[0m backup_window                         = "03:00-04:00"
+      [32m+[0m[0m ca_cert_identifier                    = (known after apply)
+      [32m+[0m[0m character_set_name                    = (known after apply)
+      [32m+[0m[0m copy_tags_to_snapshot                 = true
+      [32m+[0m[0m database_insights_mode                = (known after apply)
+      [32m+[0m[0m db_name                               = "tech_challenge"
+      [32m+[0m[0m db_subnet_group_name                  = "tech-challenge-db-subnet-group-prod"
+      [32m+[0m[0m dedicated_log_volume                  = false
+      [32m+[0m[0m delete_automated_backups              = true
+      [32m+[0m[0m deletion_protection                   = true
+      [32m+[0m[0m domain_fqdn                           = (known after apply)
+      [32m+[0m[0m enabled_cloudwatch_logs_exports       = [
+          [32m+[0m[0m "error",
+          [32m+[0m[0m "general",
+          [32m+[0m[0m "slowquery",
+        ]
+      [32m+[0m[0m endpoint                              = (known after apply)
+      [32m+[0m[0m engine                                = "mysql"
+      [32m+[0m[0m engine_lifecycle_support              = (known after apply)
+      [32m+[0m[0m engine_version                        = "8.0"
+      [32m+[0m[0m engine_version_actual                 = (known after apply)
+      [32m+[0m[0m hosted_zone_id                        = (known after apply)
+      [32m+[0m[0m id                                    = (known after apply)
+      [32m+[0m[0m identifier                            = "tech-challenge-mysql-prod"
+      [32m+[0m[0m identifier_prefix                     = (known after apply)
+      [32m+[0m[0m instance_class                        = "db.t3.micro"
+      [32m+[0m[0m iops                                  = (known after apply)
+      [32m+[0m[0m kms_key_id                            = (known after apply)
+      [32m+[0m[0m latest_restorable_time                = (known after apply)
+      [32m+[0m[0m license_model                         = (known after apply)
+      [32m+[0m[0m listener_endpoint                     = (known after apply)
+      [32m+[0m[0m maintenance_window                    = "mon:04:00-mon:05:00"
+      [32m+[0m[0m master_user_secret                    = (known after apply)
+      [32m+[0m[0m master_user_secret_kms_key_id         = (known after apply)
+      [32m+[0m[0m max_allocated_storage                 = 100
+      [32m+[0m[0m monitoring_interval                   = 60
+      [32m+[0m[0m monitoring_role_arn                   = (known after apply)
+      [32m+[0m[0m multi_az                              = true
+      [32m+[0m[0m nchar_character_set_name              = (known after apply)
+      [32m+[0m[0m network_type                          = (known after apply)
+      [32m+[0m[0m option_group_name                     = (known after apply)
+      [32m+[0m[0m parameter_group_name                  = "tech-challenge-mysql-params"
+      [32m+[0m[0m password                              = (sensitive value)
+      [32m+[0m[0m password_wo                           = (write-only attribute)
+      [32m+[0m[0m performance_insights_enabled          = true
+      [32m+[0m[0m performance_insights_kms_key_id       = (known after apply)
+      [32m+[0m[0m performance_insights_retention_period = 7
+      [32m+[0m[0m port                                  = 3306
+      [32m+[0m[0m publicly_accessible                   = false
+      [32m+[0m[0m replica_mode                          = (known after apply)
+      [32m+[0m[0m replicas                              = (known after apply)
+      [32m+[0m[0m resource_id                           = (known after apply)
+      [32m+[0m[0m skip_final_snapshot                   = false
+      [32m+[0m[0m snapshot_identifier                   = (known after apply)
+      [32m+[0m[0m status                                = (known after apply)
+      [32m+[0m[0m storage_encrypted                     = true
+      [32m+[0m[0m storage_throughput                    = (known after apply)
+      [32m+[0m[0m storage_type                          = "gp3"
+      [32m+[0m[0m tags                                  = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "ManagedBy"   = "Terraform"
+          [32m+[0m[0m "Name"        = "tech-challenge-mysql-prod"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                              = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "ManagedBy"   = "Terraform"
+          [32m+[0m[0m "Name"        = "tech-challenge-mysql-prod"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m timezone                              = (known after apply)
+      [32m+[0m[0m username                              = "admin"
+      [32m+[0m[0m vpc_security_group_ids                = (known after apply)
+    }
+
+[1m  # aws_db_parameter_group.mysql[0m will be updated in-place
+[0m  [33m~[0m[0m resource "aws_db_parameter_group" "mysql" {
+        id           = "tech-challenge-mysql-params"
+        name         = "tech-challenge-mysql-params"
+      [33m~[0m[0m tags         = {
+          [33m~[0m[0m "Environment" = "dev" [33m->[0m[0m "prod"
+            "Name"        = "tech-challenge-mysql-params"
+            "Project"     = "tech-challenge"
+        }
+      [33m~[0m[0m tags_all     = {
+          [33m~[0m[0m "Environment" = "dev" [33m->[0m[0m "prod"
+            [90m# (2 unchanged elements hidden)[0m[0m
+        }
+        [90m# (5 unchanged attributes hidden)[0m[0m
+
+      [31m-[0m[0m parameter {
+          [31m-[0m[0m apply_method = "pending-reboot" [90m-> null[0m[0m
+          [31m-[0m[0m name         = "innodb_buffer_pool_size" [90m-> null[0m[0m
+          [31m-[0m[0m value        = "{DBInstanceClassMemory*3/4}" [90m-> null[0m[0m
+        }
+      [32m+[0m[0m parameter {
+          [32m+[0m[0m apply_method = "immediate"
+          [32m+[0m[0m name         = "innodb_buffer_pool_size"
+          [32m+[0m[0m value        = "{DBInstanceClassMemory*3/4}"
+        }
+
+        [90m# (7 unchanged blocks hidden)[0m[0m
+    }
+
+[1m  # aws_db_subnet_group.main[0m must be [1m[31mreplaced[0m
+[0m[31m-[0m/[32m+[0m[0m resource "aws_db_subnet_group" "main" {
+      [33m~[0m[0m arn                     = "arn:aws:rds:us-east-1:209757840409:subgrp:tech-challenge-db-subnet-group" -> (known after apply)
+      [33m~[0m[0m id                      = "tech-challenge-db-subnet-group" -> (known after apply)
+      [33m~[0m[0m name                    = "tech-challenge-db-subnet-group" [33m->[0m[0m "tech-challenge-db-subnet-group-prod" [31m# forces replacement[0m[0m
+      [32m+[0m[0m name_prefix             = (known after apply)
+      [33m~[0m[0m subnet_ids              = [
+          [31m-[0m[0m "subnet-0437f5ad9c41cbe0f",
+          [31m-[0m[0m "subnet-055c13b3ffd48774a",
+          [32m+[0m[0m "subnet-02c8473255648a539",
+          [32m+[0m[0m "subnet-0868fe65038a6caf5",
+          [32m+[0m[0m "subnet-0f25fc07e538d9679",
+        ]
+      [33m~[0m[0m supported_network_types = [
+          [31m-[0m[0m "IPV4",
+        ] -> (known after apply)
+      [33m~[0m[0m tags                    = {
+          [33m~[0m[0m "Environment" = "dev" [33m->[0m[0m "prod"
+          [32m+[0m[0m "ManagedBy"   = "Terraform"
+          [33m~[0m[0m "Name"        = "tech-challenge-db-subnet-group" [33m->[0m[0m "tech-challenge-db-subnet-group-prod"
+            "Project"     = "tech-challenge"
+        }
+      [33m~[0m[0m tags_all                = {
+          [33m~[0m[0m "Environment" = "dev" [33m->[0m[0m "prod"
+          [32m+[0m[0m "ManagedBy"   = "Terraform"
+          [33m~[0m[0m "Name"        = "tech-challenge-db-subnet-group" [33m->[0m[0m "tech-challenge-db-subnet-group-prod"
+            [90m# (1 unchanged element hidden)[0m[0m
+        }
+      [33m~[0m[0m vpc_id                  = "vpc-05846f1676d3a40e6" -> (known after apply)
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_iam_policy.app_secrets_read[0m will be created
+[0m  [32m+[0m[0m resource "aws_iam_policy" "app_secrets_read" {
+      [32m+[0m[0m arn              = (known after apply)
+      [32m+[0m[0m attachment_count = (known after apply)
+      [32m+[0m[0m description      = "Policy for application to read database secrets"
+      [32m+[0m[0m id               = (known after apply)
+      [32m+[0m[0m name             = "tech-challenge-app-secrets-read"
+      [32m+[0m[0m name_prefix      = (known after apply)
+      [32m+[0m[0m path             = "/"
+      [32m+[0m[0m policy           = (known after apply)
+      [32m+[0m[0m policy_id        = (known after apply)
+      [32m+[0m[0m tags             = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-app-secrets-read"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all         = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-app-secrets-read"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+    }
+
+[1m  # aws_iam_policy.migration_secrets_read[0m will be created
+[0m  [32m+[0m[0m resource "aws_iam_policy" "migration_secrets_read" {
+      [32m+[0m[0m arn              = (known after apply)
+      [32m+[0m[0m attachment_count = (known after apply)
+      [32m+[0m[0m description      = "Policy for migration jobs to read database secrets"
+      [32m+[0m[0m id               = (known after apply)
+      [32m+[0m[0m name             = "tech-challenge-migration-secrets-read"
+      [32m+[0m[0m name_prefix      = (known after apply)
+      [32m+[0m[0m path             = "/"
+      [32m+[0m[0m policy           = (known after apply)
+      [32m+[0m[0m policy_id        = (known after apply)
+      [32m+[0m[0m tags             = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-migration-secrets-read"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all         = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-migration-secrets-read"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+    }
+
+[1m  # aws_iam_role.rds_enhanced_monitoring[0m must be [1m[31mreplaced[0m
+[0m[31m-[0m/[32m+[0m[0m resource "aws_iam_role" "rds_enhanced_monitoring" {
+      [33m~[0m[0m arn                   = "arn:aws:iam::209757840409:role/tech-challenge-rds-enhanced-monitoring-dev" -> (known after apply)
+      [33m~[0m[0m create_date           = "2026-01-09T15:28:32Z" -> (known after apply)
+      [33m~[0m[0m id                    = "tech-challenge-rds-enhanced-monitoring-dev" -> (known after apply)
+      [33m~[0m[0m managed_policy_arns   = [] -> (known after apply)
+      [33m~[0m[0m name                  = "tech-challenge-rds-enhanced-monitoring-dev" [33m->[0m[0m "tech-challenge-rds-enhanced-monitoring-prod" [31m# forces replacement[0m[0m
+      [32m+[0m[0m name_prefix           = (known after apply)
+      [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+      [33m~[0m[0m tags_all              = {} -> (known after apply)
+      [33m~[0m[0m unique_id             = "AROATBVUKUQMYPHHT32AM" -> (known after apply)
+        [90m# (6 unchanged attributes hidden)[0m[0m
+
+      [33m~[0m[0m inline_policy (known after apply)
+    }
+
+[1m  # aws_iam_role_policy_attachment.rds_enhanced_monitoring_attach[0m will be created
+[0m  [32m+[0m[0m resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring_attach" {
+      [32m+[0m[0m id         = (known after apply)
+      [32m+[0m[0m policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+      [32m+[0m[0m role       = "tech-challenge-rds-enhanced-monitoring-prod"
+    }
+
+[1m  # aws_secretsmanager_secret.db_admin_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret" "db_admin_credentials" {
+      [32m+[0m[0m arn                            = (known after apply)
+      [32m+[0m[0m description                    = "Admin database user credentials for RDS MySQL (restricted access)"
+      [32m+[0m[0m force_overwrite_replica_secret = false
+      [32m+[0m[0m id                             = (known after apply)
+      [32m+[0m[0m name                           = "tech-challenge/rds/mysql/admin-credentials"
+      [32m+[0m[0m name_prefix                    = (known after apply)
+      [32m+[0m[0m policy                         = (known after apply)
+      [32m+[0m[0m recovery_window_in_days        = 30
+      [32m+[0m[0m tags                           = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-admin-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                       = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-admin-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+
+      [32m+[0m[0m replica (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret.db_app_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret" "db_app_credentials" {
+      [32m+[0m[0m arn                            = (known after apply)
+      [32m+[0m[0m description                    = "Application database user credentials for RDS MySQL"
+      [32m+[0m[0m force_overwrite_replica_secret = false
+      [32m+[0m[0m id                             = (known after apply)
+      [32m+[0m[0m name                           = "tech-challenge/rds/mysql/app-credentials"
+      [32m+[0m[0m name_prefix                    = (known after apply)
+      [32m+[0m[0m policy                         = (known after apply)
+      [32m+[0m[0m recovery_window_in_days        = 30
+      [32m+[0m[0m tags                           = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-app-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                       = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-app-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+
+      [32m+[0m[0m replica (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret.db_master_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret" "db_master_credentials" {
+      [32m+[0m[0m arn                            = (known after apply)
+      [32m+[0m[0m description                    = "Master database credentials for RDS MySQL"
+      [32m+[0m[0m force_overwrite_replica_secret = false
+      [32m+[0m[0m id                             = (known after apply)
+      [32m+[0m[0m name                           = "tech-challenge/rds/mysql/master-credentials"
+      [32m+[0m[0m name_prefix                    = (known after apply)
+      [32m+[0m[0m policy                         = (known after apply)
+      [32m+[0m[0m recovery_window_in_days        = 30
+      [32m+[0m[0m tags                           = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-master-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                       = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-master-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+
+      [32m+[0m[0m replica (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret.db_migration_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret" "db_migration_credentials" {
+      [32m+[0m[0m arn                            = (known after apply)
+      [32m+[0m[0m description                    = "Migration database user credentials for RDS MySQL"
+      [32m+[0m[0m force_overwrite_replica_secret = false
+      [32m+[0m[0m id                             = (known after apply)
+      [32m+[0m[0m name                           = "tech-challenge/rds/mysql/migration-credentials"
+      [32m+[0m[0m name_prefix                    = (known after apply)
+      [32m+[0m[0m policy                         = (known after apply)
+      [32m+[0m[0m recovery_window_in_days        = 30
+      [32m+[0m[0m tags                           = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-migration-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all                       = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "Name"        = "tech-challenge-db-migration-secret"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+
+      [32m+[0m[0m replica (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret_version.db_admin_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret_version" "db_admin_credentials" {
+      [32m+[0m[0m arn                  = (known after apply)
+      [32m+[0m[0m has_secret_string_wo = (known after apply)
+      [32m+[0m[0m id                   = (known after apply)
+      [32m+[0m[0m secret_id            = (known after apply)
+      [32m+[0m[0m secret_string        = (sensitive value)
+      [32m+[0m[0m secret_string_wo     = (write-only attribute)
+      [32m+[0m[0m version_id           = (known after apply)
+      [32m+[0m[0m version_stages       = (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret_version.db_app_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret_version" "db_app_credentials" {
+      [32m+[0m[0m arn                  = (known after apply)
+      [32m+[0m[0m has_secret_string_wo = (known after apply)
+      [32m+[0m[0m id                   = (known after apply)
+      [32m+[0m[0m secret_id            = (known after apply)
+      [32m+[0m[0m secret_string        = (sensitive value)
+      [32m+[0m[0m secret_string_wo     = (write-only attribute)
+      [32m+[0m[0m version_id           = (known after apply)
+      [32m+[0m[0m version_stages       = (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret_version.db_master_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret_version" "db_master_credentials" {
+      [32m+[0m[0m arn                  = (known after apply)
+      [32m+[0m[0m has_secret_string_wo = (known after apply)
+      [32m+[0m[0m id                   = (known after apply)
+      [32m+[0m[0m secret_id            = (known after apply)
+      [32m+[0m[0m secret_string        = (sensitive value)
+      [32m+[0m[0m secret_string_wo     = (write-only attribute)
+      [32m+[0m[0m version_id           = (known after apply)
+      [32m+[0m[0m version_stages       = (known after apply)
+    }
+
+[1m  # aws_secretsmanager_secret_version.db_migration_credentials[0m will be created
+[0m  [32m+[0m[0m resource "aws_secretsmanager_secret_version" "db_migration_credentials" {
+      [32m+[0m[0m arn                  = (known after apply)
+      [32m+[0m[0m has_secret_string_wo = (known after apply)
+      [32m+[0m[0m id                   = (known after apply)
+      [32m+[0m[0m secret_id            = (known after apply)
+      [32m+[0m[0m secret_string        = (sensitive value)
+      [32m+[0m[0m secret_string_wo     = (write-only attribute)
+      [32m+[0m[0m version_id           = (known after apply)
+      [32m+[0m[0m version_stages       = (known after apply)
+    }
+
+[1m  # aws_security_group.rds[0m will be created
+[0m  [32m+[0m[0m resource "aws_security_group" "rds" {
+      [32m+[0m[0m arn                    = (known after apply)
+      [32m+[0m[0m description            = "Security group for RDS MySQL instance"
+      [32m+[0m[0m egress                 = [
+          [32m+[0m[0m {
+              [32m+[0m[0m cidr_blocks      = [
+                  [32m+[0m[0m "0.0.0.0/0",
+                ]
+              [32m+[0m[0m description      = "Allow all outbound traffic"
+              [32m+[0m[0m from_port        = 0
+              [32m+[0m[0m ipv6_cidr_blocks = []
+              [32m+[0m[0m prefix_list_ids  = []
+              [32m+[0m[0m protocol         = "-1"
+              [32m+[0m[0m security_groups  = []
+              [32m+[0m[0m self             = false
+              [32m+[0m[0m to_port          = 0
+            },
+        ]
+      [32m+[0m[0m id                     = (known after apply)
+      [32m+[0m[0m ingress                = (known after apply)
+      [32m+[0m[0m name                   = "tech-challenge-rds-sg-prod"
+      [32m+[0m[0m name_prefix            = (known after apply)
+      [32m+[0m[0m owner_id               = (known after apply)
+      [32m+[0m[0m revoke_rules_on_delete = false
+      [32m+[0m[0m tags                   = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "ManagedBy"   = "Terraform"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-sg-prod"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m tags_all               = {
+          [32m+[0m[0m "Environment" = "prod"
+          [32m+[0m[0m "ManagedBy"   = "Terraform"
+          [32m+[0m[0m "Name"        = "tech-challenge-rds-sg-prod"
+          [32m+[0m[0m "Project"     = "tech-challenge"
+        }
+      [32m+[0m[0m vpc_id                 = "vpc-0b596a68f21b5a088"
+    }
+
+[1m  # random_password.db_admin_password[0m will be created
+[0m  [32m+[0m[0m resource "random_password" "db_admin_password" {
+      [32m+[0m[0m bcrypt_hash      = (sensitive value)
+      [32m+[0m[0m id               = (known after apply)
+      [32m+[0m[0m length           = 32
+      [32m+[0m[0m lower            = true
+      [32m+[0m[0m min_lower        = 0
+      [32m+[0m[0m min_numeric      = 0
+      [32m+[0m[0m min_special      = 0
+      [32m+[0m[0m min_upper        = 0
+      [32m+[0m[0m number           = true
+      [32m+[0m[0m numeric          = true
+      [32m+[0m[0m override_special = "!#$%&*()-_=+[]{}<>:?"
+      [32m+[0m[0m result           = (sensitive value)
+      [32m+[0m[0m special          = true
+      [32m+[0m[0m upper            = true
+    }
+
+[1m  # random_password.db_app_password[0m will be created
+[0m  [32m+[0m[0m resource "random_password" "db_app_password" {
+      [32m+[0m[0m bcrypt_hash      = (sensitive value)
+      [32m+[0m[0m id               = (known after apply)
+      [32m+[0m[0m length           = 32
+      [32m+[0m[0m lower            = true
+      [32m+[0m[0m min_lower        = 0
+      [32m+[0m[0m min_numeric      = 0
+      [32m+[0m[0m min_special      = 0
+      [32m+[0m[0m min_upper        = 0
+      [32m+[0m[0m number           = true
+      [32m+[0m[0m numeric          = true
+      [32m+[0m[0m override_special = "!#$%&*()-_=+[]{}<>:?"
+      [32m+[0m[0m result           = (sensitive value)
+      [32m+[0m[0m special          = true
+      [32m+[0m[0m upper            = true
+    }
+
+[1m  # random_password.db_migration_password[0m will be created
+[0m  [32m+[0m[0m resource "random_password" "db_migration_password" {
+      [32m+[0m[0m bcrypt_hash      = (sensitive value)
+      [32m+[0m[0m id               = (known after apply)
+      [32m+[0m[0m length           = 32
+      [32m+[0m[0m lower            = true
+      [32m+[0m[0m min_lower        = 0
+      [32m+[0m[0m min_numeric      = 0
+      [32m+[0m[0m min_special      = 0
+      [32m+[0m[0m min_upper        = 0
+      [32m+[0m[0m number           = true
+      [32m+[0m[0m numeric          = true
+      [32m+[0m[0m override_special = "!#$%&*()-_=+[]{}<>:?"
+      [32m+[0m[0m result           = (sensitive value)
+      [32m+[0m[0m special          = true
+      [32m+[0m[0m upper            = true
+    }
+
+[1mPlan:[0m [0m26 to add, 1 to change, 2 to destroy.
+
+Changes to Outputs:
+  [32m+[0m[0m app_secrets_read_policy_arn       = (known after apply)
+  [32m+[0m[0m migration_secrets_read_policy_arn = (known after apply)
+  [32m+[0m[0m rds_admin_secret_arn              = (known after apply)
+  [32m+[0m[0m rds_app_secret_arn                = (known after apply)
+  [32m+[0m[0m rds_database_name                 = "tech_challenge"
+  [32m+[0m[0m rds_endpoint                      = (known after apply)
+  [32m+[0m[0m rds_instance_id                   = (known after apply)
+  [32m+[0m[0m rds_master_secret_arn             = (known after apply)
+  [32m+[0m[0m rds_migration_secret_arn          = (known after apply)
+  [32m+[0m[0m rds_port                          = 3306
+  [32m+[0m[0m rds_security_group_id             = (known after apply)
+[90m
+─────────────────────────────────────────────────────────────────────────────[0m
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
+Releasing state lock. This may take a few moments...

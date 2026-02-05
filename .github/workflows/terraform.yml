@@ -1,56 +1,71 @@
-name: Terraform CI/CD
+name: "Plan/Deploy Production (infra-banco)"
 
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-    paths:
-      - '**.tf'
-      - '**.tfvars'
-      - '.github/workflows/terraform.yml'
-  push:
-    branches:
-      - main
-      - develop
-    paths:
-      - '**.tf'
-      - '**.tfvars'
-      - '.github/workflows/terraform.yml'
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment to deploy to'
+      action:
+        description: "O que executar?"
         required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - deploy
+      deploy_prod:
+        description: "Confirma deploy em produção? (obrigatório para 'deploy')"
+        required: true
+        default: false
+        type: boolean
+      environment:
+        description: "Ambiente"
+        required: true
+        default: "prod"
         type: choice
         options:
           - dev
           - staging
           - prod
-      action:
-        description: 'Action to perform'
+      ns:
+        description: "Namespace/pessoa (ex: grupo19)"
         required: true
-        type: choice
-        options:
-          - plan
-          - apply
+        default: "grupo19"
+        type: string
 
-env:
-  TF_VERSION: '1.13.0'
-  AWS_REGION: 'us-east-1'
+permissions:
+  contents: read
 
 jobs:
-  validate:
-    name: Validate Terraform
+  prod:
     runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      TF_DIR: .
+      STATE_PREFIX: state
+      REPO: infra-banco
+
+      # Ajuste conforme sua realidade
+      # Se seu infra-k8s também cria VPC, pode manter os dois iguais.
+      STACK_K8S: infra-k8s
+      STACK_VPC: infra-k8s
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: "Safety check: deploy only if deploy_prod=true"
+        if: ${{ inputs.action == 'deploy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.deploy_prod }}" != "true" ]; then
+            echo "deploy_prod=false → abortando deploy"
+            exit 0
+          fi
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
       - name: Configure AWS credentials
@@ -58,292 +73,232 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
-        continue-on-error: false
-
-      - name: Terraform Init
-        run: terraform init -backend=false
-
-      - name: Terraform Validate
-        run: terraform validate
-
-  plan-dev:
-    name: Plan - Dev
-    runs-on: ubuntu-latest
-    needs: validate
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform Init
+      - name: "Resolve tfvars + project/env/region + state keys"
+        id: env
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
         run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra-db/dev/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TERRAFORM_STATE_LOCK_TABLE }}"
+          set -euo pipefail
 
-      - name: Terraform Plan - Dev
-        id: plan-dev
+          ENV="${{ inputs.environment }}"
+          NS="${{ inputs.ns }}"
+
+          # escolhe tfvars por ambiente (com fallback)
+          if [ -f "terraform.${ENV}.tfvars" ]; then
+            TFVARS="terraform.${ENV}.tfvars"
+          elif [ -f "terraform.tfvars" ]; then
+            TFVARS="terraform.tfvars"
+          elif [ -f "terraform.tfvars.example" ]; then
+            TFVARS="terraform.tfvars.example"
+          else
+            echo "ERROR: no tfvars found (terraform.${ENV}.tfvars / terraform.tfvars / terraform.tfvars.example)."
+            exit 1
+          fi
+
+          # extrai project/env/region do tfvars (se faltar, usa defaults)
+          get_tfvar() {
+            local key="$1"
+            sed -nE 's/^\s*'"$key"'\s*=\s*"([^"]+)".*$/\1/p' "$TFVARS" | head -n1
+          }
+
+          PROJECT_NAME="$(get_tfvar project_name)"
+          ENV_TFVARS="$(get_tfvar environment)"
+          AWS_REGION_TFV="$(get_tfvar aws_region)"
+
+          : "${PROJECT_NAME:=tech-challenge}"
+          : "${ENV_TFVARS:=${ENV}}"
+          : "${AWS_REGION_TFV:=us-east-1}"
+
+          # state do stack atual (infra-banco)
+          STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.REPO }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+
+          # remote states
+          VPC_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_VPC }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+          K8S_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_K8S }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+
+          echo "tfvars=${TFVARS}" >> "$GITHUB_OUTPUT"
+          echo "project_name=${PROJECT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "environment=${ENV_TFVARS}" >> "$GITHUB_OUTPUT"
+          echo "aws_region=${AWS_REGION_TFV}" >> "$GITHUB_OUTPUT"
+          echo "ns=${NS}" >> "$GITHUB_OUTPUT"
+          echo "state_key=${STATE_KEY}" >> "$GITHUB_OUTPUT"
+          echo "vpc_state_key=${VPC_STATE_KEY}" >> "$GITHUB_OUTPUT"
+          echo "k8s_state_key=${K8S_STATE_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: "Discover backend (bucket + lock table) via AWS"
+        id: backend
+        shell: bash
         run: |
+          set -euo pipefail
+
+          PROJECT="${{ steps.env.outputs.project_name }}"
+          ENVIRONMENT="${{ steps.env.outputs.environment }}"
+          REGION="${{ steps.env.outputs.aws_region }}"
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+
+          PREFIX="${PROJECT}-tfstate-${ACCOUNT_ID}-${REGION}-${ENVIRONMENT}-"
+
+          BUCKET="$(aws s3api list-buckets \
+            --query "Buckets[?starts_with(Name, \`${PREFIX}\`)].Name | sort(@) | [-1]" \
+            --output text)"
+
+          if [ -z "${BUCKET}" ] || [ "${BUCKET}" = "None" ]; then
+            echo "ERROR: Não achei bucket de state com prefixo: ${PREFIX}"
+            aws s3api list-buckets --query "Buckets[].Name" --output text | tr '\t' '\n' | grep -E "${PROJECT}-tfstate-${ACCOUNT_ID}-${REGION}-${ENVIRONMENT}" || true
+            exit 1
+          fi
+
+          LOCK_TABLE="${PROJECT}-terraform-locks-${ACCOUNT_ID}-${REGION}-${ENVIRONMENT}"
+
+          {
+            echo "bucket=${BUCKET}"
+            echo "lock_table=${LOCK_TABLE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: "Export TF_VAR remote states (VPC + K8s)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${{ steps.backend.outputs.bucket }}"
+          REGION="${{ steps.env.outputs.aws_region }}"
+
+          echo "TF_VAR_use_remote_state=true" >> "$GITHUB_ENV"
+
+          # VPC
+          echo "TF_VAR_vpc_remote_state_bucket=${BUCKET}" >> "$GITHUB_ENV"
+          echo "TF_VAR_vpc_remote_state_key=${{ steps.env.outputs.vpc_state_key }}" >> "$GITHUB_ENV"
+          echo "TF_VAR_vpc_remote_state_region=${REGION}" >> "$GITHUB_ENV"
+
+          # K8s
+          echo "TF_VAR_k8s_remote_state_bucket=${BUCKET}" >> "$GITHUB_ENV"
+          echo "TF_VAR_k8s_remote_state_key=${{ steps.env.outputs.k8s_state_key }}" >> "$GITHUB_ENV"
+          echo "TF_VAR_k8s_remote_state_region=${REGION}" >> "$GITHUB_ENV"
+
+      - name: "Sanity check: remote states exist (S3 head-object)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${{ steps.backend.outputs.bucket }}"
+
+          echo "Checking VPC state: s3://${BUCKET}/${{ steps.env.outputs.vpc_state_key }}"
+          aws s3api head-object --bucket "${BUCKET}" --key "${{ steps.env.outputs.vpc_state_key }}" >/dev/null
+
+          echo "Checking K8s state: s3://${BUCKET}/${{ steps.env.outputs.k8s_state_key }}"
+          aws s3api head-object --bucket "${BUCKET}" --key "${{ steps.env.outputs.k8s_state_key }}" >/dev/null
+
+      - name: "Fail-fast: required outputs exist in remote states (read tfstate + jq)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${{ steps.backend.outputs.bucket }}"
+          VPC_KEY="${{ steps.env.outputs.vpc_state_key }}"
+          K8S_KEY="${{ steps.env.outputs.k8s_state_key }}"
+
+          # baixa states
+          aws s3 cp "s3://${BUCKET}/${VPC_KEY}" vpc.tfstate
+          aws s3 cp "s3://${BUCKET}/${K8S_KEY}" k8s.tfstate
+
+          echo "VPC outputs keys:"
+          jq -r '.outputs | keys[]' vpc.tfstate | tee vpc_outputs_keys.txt
+          echo "K8s outputs keys:"
+          jq -r '.outputs | keys[]' k8s.tfstate | tee k8s_outputs_keys.txt
+
+          # vazio?
+          if [ ! -s vpc_outputs_keys.txt ]; then
+            echo "ERROR: VPC state has no outputs."
+            exit 1
+          fi
+          if [ ! -s k8s_outputs_keys.txt ]; then
+            echo "ERROR: K8s state has no outputs."
+            exit 1
+          fi
+
+          # valida chaves mínimas (ajuste conforme o que o infra-banco usa)
+          # VPC: normalmente precisa de vpc_id e/ou subnets
+          if ! grep -Eq '(^vpc_id$|^private_subnet_ids$|^public_subnet_ids$)' vpc_outputs_keys.txt; then
+            echo "ERROR: Expected VPC outputs not found (vpc_id/private_subnet_ids/public_subnet_ids)."
+            echo "Tip: if your VPC is inside infra-k8s, ensure those outputs exist there (they do in your apply)."
+            exit 1
+          fi
+
+          # K8s: SGs do cluster/nodes (você tem esses outputs no infra-k8s)
+          if ! grep -Eq '(^eks_nodes_sg_id$|^eks_nodes_security_group_id$)' k8s_outputs_keys.txt; then
+            echo "ERROR: Expected K8s node SG output not found (eks_nodes_sg_id or eks_nodes_security_group_id)."
+            exit 1
+          fi
+          # cluster SG pode ser lista OU string; preferir string:
+          if ! grep -Eq '(^eks_cluster_security_group_id$|^cluster_security_group_id$)' k8s_outputs_keys.txt; then
+            echo "ERROR: Expected K8s cluster SG output not found (eks_cluster_security_group_id or cluster_security_group_id)."
+            exit 1
+          fi
+
+      - name: "Terraform init (remote backend)"
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${{ steps.backend.outputs.bucket }}" \
+            -backend-config="key=${{ steps.env.outputs.state_key }}" \
+            -backend-config="region=${{ steps.env.outputs.aws_region }}" \
+            -backend-config="dynamodb_table=${{ steps.backend.outputs.lock_table }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Terraform validate
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform validate -no-color
+
+      - name: "Terraform plan (gera arquivo + texto) - detailed exit codes"
+        id: plan
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          set -euo pipefail
+
+          set +e
           terraform plan \
-            -var-file=terraform.dev.tfvars \
-            -out=tfplan-dev \
-            -no-color | tee tfplan-dev.txt
-        continue-on-error: true
+            -var-file="${{ steps.env.outputs.tfvars }}" \
+            -input=false \
+            -no-color \
+            -detailed-exitcode \
+            -out=tfplan 2>&1 | tee plan.log
+          code=${PIPESTATUS[0]}
+          set -e
 
-      - name: Upload Plan Artifact
+          if [ "$code" -eq 1 ]; then
+            echo "terraform plan FAILED (exit 1). Veja o erro acima e no artifact plan.log"
+            exit 1
+          elif [ "$code" -eq 2 ]; then
+            echo "Plan has changes (exit 2) — continuing"
+          else
+            echo "Plan has no changes (exit 0)"
+          fi
+
+          terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload plan artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-dev
-          path: tfplan-dev
-          retention-days: 5
+          name: tfplan-${{ steps.env.outputs.environment }}-${{ steps.env.outputs.ns }}-${{ env.REPO }}
+          path: |
+            tfplan
+            tfplan.txt
+            vpc_outputs_keys.txt
+            k8s_outputs_keys.txt
 
-      - name: Comment PR - Dev
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const plan = fs.existsSync('tfplan-dev.txt')
-              ? fs.readFileSync('tfplan-dev.txt', 'utf8')
-              : 'Plan output not available';
-
-            const output = `#### Terraform Plan - Dev Environment
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${plan}
-            \`\`\`
-
-            </details>
-
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
-  plan-staging:
-    name: Plan - Staging
-    runs-on: ubuntu-latest
-    needs: validate
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform Init
+      - name: "Terraform apply (deploy)"
+        if: ${{ inputs.action == 'deploy' }}
+        shell: bash
+        working-directory: ${{ env.TF_DIR }}
         run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra-db/staging/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TERRAFORM_STATE_LOCK_TABLE }}"
-
-      - name: Terraform Plan - Staging
-        id: plan-staging
-        run: |
-          terraform plan \
-            -var-file=terraform.staging.tfvars \
-            -out=tfplan-staging \
-            -no-color | tee tfplan-staging.txt
-        continue-on-error: true
-
-      - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-staging
-          path: tfplan-staging
-          retention-days: 5
-
-      - name: Comment PR - Staging
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const plan = fs.existsSync('tfplan-staging.txt')
-              ? fs.readFileSync('tfplan-staging.txt', 'utf8')
-              : 'Plan output not available';
-
-            const output = `#### Terraform Plan - Staging Environment
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${plan}
-            \`\`\`
-
-            </details>
-
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
-  plan-prod:
-    name: Plan - Prod
-    runs-on: ubuntu-latest
-    needs: validate
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform Init
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra-db/prod/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TERRAFORM_STATE_LOCK_TABLE }}"
-
-      - name: Terraform Plan - Prod
-        id: plan-prod
-        run: |
-          terraform plan \
-            -var-file=terraform.prod.tfvars \
-            -out=tfplan-prod \
-            -no-color | tee tfplan-prod.txt
-        continue-on-error: true
-
-      - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-prod
-          path: tfplan-prod
-          retention-days: 5
-
-      - name: Comment PR - Prod
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const plan = fs.existsSync('tfplan-prod.txt')
-              ? fs.readFileSync('tfplan-prod.txt', 'utf8')
-              : 'Plan output not available';
-
-            const output = `#### Terraform Plan - Prod Environment
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${plan}
-            \`\`\`
-
-            </details>
-
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
-  apply:
-    name: Apply - ${{ github.event.inputs.environment }}
-    runs-on: ubuntu-latest
-    needs: []
-    if: github.event_name == 'workflow_dispatch'
-    environment:
-      name: ${{ github.event.inputs.environment }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform Init
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=infra-db/${{ github.event.inputs.environment }}/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TERRAFORM_STATE_LOCK_TABLE }}"
-
-      - name: Terraform Plan
-        if: github.event.inputs.action == 'apply'
-        run: |
-          terraform plan \
-            -var-file=terraform.${{ github.event.inputs.environment }}.tfvars \
-            -out=tfplan-${{ github.event.inputs.environment }} \
+          set -euo pipefail
+          terraform apply \
+            -var-file="${{ steps.env.outputs.tfvars }}" \
+            -input=false \
+            -auto-approve \
             -no-color
-
-      - name: Terraform Apply
-        if: github.event.inputs.action == 'apply'
-        run: |
-          terraform apply -auto-approve tfplan-${{ github.event.inputs.environment }}
-
-      - name: Terraform Plan (Plan Only)
-        if: github.event.inputs.action == 'plan'
-        run: |
-          terraform plan \
-            -var-file=terraform.${{ github.event.inputs.environment }}.tfvars \
-            -no-color
-
