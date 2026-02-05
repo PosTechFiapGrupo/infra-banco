@@ -1,4 +1,4 @@
-name: Plan/Deploy Production (infra-banco)
+name: "Plan/Deploy Production (infra-banco)"
 
 on:
   workflow_dispatch:
@@ -44,15 +44,16 @@ jobs:
       STATE_PREFIX: state
       REPO: infra-banco
 
-      # ajuste conforme sua realidade
+      # Ajuste conforme sua realidade
+      # Se seu infra-k8s também cria VPC, pode manter os dois iguais.
       STACK_K8S: infra-k8s
-      STACK_VPC: infra-k8s # se VPC for separado, troque para infra-vpc
+      STACK_VPC: infra-k8s
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Safety check (deploy)
+      - name: "Safety check: deploy only if deploy_prod=true"
         if: ${{ inputs.action == 'deploy' }}
         shell: bash
         run: |
@@ -74,7 +75,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Resolve tfvars + project/env/region + state keys
+      - name: "Resolve tfvars + project/env/region + state keys"
         id: env
         shell: bash
         working-directory: ${{ env.TF_DIR }}
@@ -84,6 +85,7 @@ jobs:
           ENV="${{ inputs.environment }}"
           NS="${{ inputs.ns }}"
 
+          # escolhe tfvars por ambiente (com fallback)
           if [ -f "terraform.${ENV}.tfvars" ]; then
             TFVARS="terraform.${ENV}.tfvars"
           elif [ -f "terraform.tfvars" ]; then
@@ -95,6 +97,7 @@ jobs:
             exit 1
           fi
 
+          # extrai project/env/region do tfvars (se faltar, usa defaults)
           get_tfvar() {
             local key="$1"
             sed -nE 's/^\s*'"$key"'\s*=\s*"([^"]+)".*$/\1/p' "$TFVARS" | head -n1
@@ -108,7 +111,10 @@ jobs:
           : "${ENV_TFVARS:=${ENV}}"
           : "${AWS_REGION_TFV:=us-east-1}"
 
+          # state do stack atual (infra-banco)
           STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.REPO }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
+
+          # remote states
           VPC_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_VPC }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
           K8S_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_K8S }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
 
@@ -121,7 +127,7 @@ jobs:
           echo "vpc_state_key=${VPC_STATE_KEY}" >> "$GITHUB_OUTPUT"
           echo "k8s_state_key=${K8S_STATE_KEY}" >> "$GITHUB_OUTPUT"
 
-      - name: Discover backend (bucket + lock table) via AWS
+      - name: "Discover backend (bucket + lock table) via AWS"
         id: backend
         shell: bash
         run: |
@@ -151,7 +157,7 @@ jobs:
             echo "lock_table=${LOCK_TABLE}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Export TF_VAR remote states (VPC + K8s)
+      - name: "Export TF_VAR remote states (VPC + K8s)"
         shell: bash
         run: |
           set -euo pipefail
@@ -160,15 +166,17 @@ jobs:
 
           echo "TF_VAR_use_remote_state=true" >> "$GITHUB_ENV"
 
+          # VPC
           echo "TF_VAR_vpc_remote_state_bucket=${BUCKET}" >> "$GITHUB_ENV"
           echo "TF_VAR_vpc_remote_state_key=${{ steps.env.outputs.vpc_state_key }}" >> "$GITHUB_ENV"
           echo "TF_VAR_vpc_remote_state_region=${REGION}" >> "$GITHUB_ENV"
 
+          # K8s
           echo "TF_VAR_k8s_remote_state_bucket=${BUCKET}" >> "$GITHUB_ENV"
           echo "TF_VAR_k8s_remote_state_key=${{ steps.env.outputs.k8s_state_key }}" >> "$GITHUB_ENV"
           echo "TF_VAR_k8s_remote_state_region=${REGION}" >> "$GITHUB_ENV"
 
-      - name: Sanity check remote states exist (S3 head-object)
+      - name: "Sanity check: remote states exist (S3 head-object)"
         shell: bash
         run: |
           set -euo pipefail
@@ -180,7 +188,53 @@ jobs:
           echo "Checking K8s state: s3://${BUCKET}/${{ steps.env.outputs.k8s_state_key }}"
           aws s3api head-object --bucket "${BUCKET}" --key "${{ steps.env.outputs.k8s_state_key }}" >/dev/null
 
-      - name: Terraform init (remote backend)
+      - name: "Fail-fast: required outputs exist in remote states (read tfstate + jq)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${{ steps.backend.outputs.bucket }}"
+          VPC_KEY="${{ steps.env.outputs.vpc_state_key }}"
+          K8S_KEY="${{ steps.env.outputs.k8s_state_key }}"
+
+          # baixa states
+          aws s3 cp "s3://${BUCKET}/${VPC_KEY}" vpc.tfstate
+          aws s3 cp "s3://${BUCKET}/${K8S_KEY}" k8s.tfstate
+
+          echo "VPC outputs keys:"
+          jq -r '.outputs | keys[]' vpc.tfstate | tee vpc_outputs_keys.txt
+          echo "K8s outputs keys:"
+          jq -r '.outputs | keys[]' k8s.tfstate | tee k8s_outputs_keys.txt
+
+          # vazio?
+          if [ ! -s vpc_outputs_keys.txt ]; then
+            echo "ERROR: VPC state has no outputs."
+            exit 1
+          fi
+          if [ ! -s k8s_outputs_keys.txt ]; then
+            echo "ERROR: K8s state has no outputs."
+            exit 1
+          fi
+
+          # valida chaves mínimas (ajuste conforme o que o infra-banco usa)
+          # VPC: normalmente precisa de vpc_id e/ou subnets
+          if ! grep -Eq '(^vpc_id$|^private_subnet_ids$|^public_subnet_ids$)' vpc_outputs_keys.txt; then
+            echo "ERROR: Expected VPC outputs not found (vpc_id/private_subnet_ids/public_subnet_ids)."
+            echo "Tip: if your VPC is inside infra-k8s, ensure those outputs exist there (they do in your apply)."
+            exit 1
+          fi
+
+          # K8s: SGs do cluster/nodes (você tem esses outputs no infra-k8s)
+          if ! grep -Eq '(^eks_nodes_sg_id$|^eks_nodes_security_group_id$)' k8s_outputs_keys.txt; then
+            echo "ERROR: Expected K8s node SG output not found (eks_nodes_sg_id or eks_nodes_security_group_id)."
+            exit 1
+          fi
+          # cluster SG pode ser lista OU string; preferir string:
+          if ! grep -Eq '(^eks_cluster_security_group_id$|^cluster_security_group_id$)' k8s_outputs_keys.txt; then
+            echo "ERROR: Expected K8s cluster SG output not found (eks_cluster_security_group_id or cluster_security_group_id)."
+            exit 1
+          fi
+
+      - name: "Terraform init (remote backend)"
         shell: bash
         working-directory: ${{ env.TF_DIR }}
         run: |
@@ -198,26 +252,7 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform validate -no-color
 
-      - name: "Fail-fast: remote_state k8s must have outputs + expected keys"
-        shell: bash
-        working-directory: ${{ env.TF_DIR }}
-        run: |
-          set -euo pipefail
-
-          terraform console -var-file="${{ steps.env.outputs.tfvars }}" <<< 'keys(data.terraform_remote_state.k8s.outputs)' > k8s_outputs_keys.txt || true
-          cat k8s_outputs_keys.txt
-
-          if grep -q '^\[\s*\]$' k8s_outputs_keys.txt; then
-            echo "ERROR: k8s remote_state outputs is empty. Check k8s_remote_state_key/bucket/region."
-            exit 1
-          fi
-
-          if ! grep -Eq 'cluster_security_group_id|eks_nodes_sg_id' k8s_outputs_keys.txt; then
-            echo "ERROR: Expected outputs not found in k8s state (cluster_security_group_id or eks_nodes_sg_id)."
-            exit 1
-          fi
-
-      - name: Terraform plan (gera arquivo + texto) - detailed exit codes
+      - name: "Terraform plan (gera arquivo + texto) - detailed exit codes"
         id: plan
         shell: bash
         working-directory: ${{ env.TF_DIR }}
@@ -253,9 +288,10 @@ jobs:
           path: |
             tfplan
             tfplan.txt
+            vpc_outputs_keys.txt
             k8s_outputs_keys.txt
 
-      - name: Terraform apply (deploy)
+      - name: "Terraform apply (deploy)"
         if: ${{ inputs.action == 'deploy' }}
         shell: bash
         working-directory: ${{ env.TF_DIR }}
