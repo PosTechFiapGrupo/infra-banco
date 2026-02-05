@@ -198,7 +198,7 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform validate -no-color
 
-      - name: Fail-fast: remote_state k8s must have outputs + expected keys
+      - name: "Fail-fast: remote_state k8s must have outputs + expected keys"
         shell: bash
         working-directory: ${{ env.TF_DIR }}
         run: |
