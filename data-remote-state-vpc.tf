@@ -60,26 +60,34 @@ locals {
   )
 
   # -------------------------
-  # EKS - SG dos Nodes (o seu SG "criado no Terraform")
+  # EKS - SG dos Nodes
+  # (prefere eks_nodes_sg_id; fallback p/ eks_nodes_security_group_id)
   # -------------------------
   eks_nodes_sg_id = (
     var.use_remote_state
-    ? try(data.terraform_remote_state.k8s.outputs.eks_nodes_sg_id, null)
+    ? try(
+        data.terraform_remote_state.k8s.outputs.eks_nodes_sg_id,
+        data.terraform_remote_state.k8s.outputs.eks_nodes_security_group_id,
+        null
+      )
     : var.eks_nodes_sg_id_override
   )
 
   # -------------------------
-  # EKS - Cluster Security Group (pega string mesmo se vier como lista/tuple)
+  # EKS - Cluster Security Group
+  # Preferir string: eks_cluster_security_group_id (seu infra-k8s exporta)
+  # Fallbacks: cluster_security_group_id (pode ser lista/tuple)
   # -------------------------
   eks_cluster_sg_id = (
     var.use_remote_state
     ? try(
-      one(data.terraform_remote_state.k8s.outputs.cluster_security_group_id),
-      data.terraform_remote_state.k8s.outputs.cluster_security_group_id
-    )
+        data.terraform_remote_state.k8s.outputs.eks_cluster_security_group_id,
+        one(data.terraform_remote_state.k8s.outputs.cluster_security_group_id),
+        data.terraform_remote_state.k8s.outputs.cluster_security_group_id[0],
+        null
+      )
     : var.eks_cluster_sg_id_override
   )
-
 
   # -------------------------
   # SGs permitidos no RDS
