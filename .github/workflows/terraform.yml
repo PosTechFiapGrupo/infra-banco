@@ -8,7 +8,9 @@ on:
         required: true
         default: "plan"
         type: choice
-        options: [plan, deploy]
+        options:
+          - plan
+          - deploy
       deploy_prod:
         description: "Confirma deploy em produção? (obrigatório para 'deploy')"
         required: true
@@ -19,12 +21,18 @@ on:
         required: true
         default: "prod"
         type: choice
-        options: [dev, staging, prod]
+        options:
+          - dev
+          - staging
+          - prod
       ns:
         description: "Namespace/pessoa (ex: grupo19)"
         required: true
         default: "grupo19"
         type: string
+
+permissions:
+  contents: read
 
 jobs:
   prod:
@@ -38,28 +46,31 @@ jobs:
 
       # ajuste conforme sua realidade
       STACK_K8S: infra-k8s
-      STACK_VPC: infra-k8s   # se VPC for separado, troque para infra-vpc
+      STACK_VPC: infra-k8s # se VPC for separado, troque para infra-vpc
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Safety check (deploy)
         if: ${{ inputs.action == 'deploy' }}
         shell: bash
         run: |
+          set -euo pipefail
           if [ "${{ inputs.deploy_prod }}" != "true" ]; then
             echo "deploy_prod=false → abortando deploy"
             exit 0
           fi
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
@@ -73,7 +84,6 @@ jobs:
           ENV="${{ inputs.environment }}"
           NS="${{ inputs.ns }}"
 
-          # escolhe tfvars por ambiente (com fallback)
           if [ -f "terraform.${ENV}.tfvars" ]; then
             TFVARS="terraform.${ENV}.tfvars"
           elif [ -f "terraform.tfvars" ]; then
@@ -85,7 +95,6 @@ jobs:
             exit 1
           fi
 
-          # extrai project/env/region do tfvars (se faltar, usa defaults)
           get_tfvar() {
             local key="$1"
             sed -nE 's/^\s*'"$key"'\s*=\s*"([^"]+)".*$/\1/p' "$TFVARS" | head -n1
@@ -95,15 +104,11 @@ jobs:
           ENV_TFVARS="$(get_tfvar environment)"
           AWS_REGION_TFV="$(get_tfvar aws_region)"
 
-          # defaults (caso falte no tfvars)
           : "${PROJECT_NAME:=tech-challenge}"
           : "${ENV_TFVARS:=${ENV}}"
           : "${AWS_REGION_TFV:=us-east-1}"
 
-          # state do stack atual (infra-banco)
           STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.REPO }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
-
-          # remote states
           VPC_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_VPC }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
           K8S_STATE_KEY="${{ env.STATE_PREFIX }}/${{ env.STACK_K8S }}/${ENV_TFVARS}/${NS}/terraform.tfstate"
 
@@ -199,21 +204,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          # lista outputs do remote state
           terraform console -var-file="${{ steps.env.outputs.tfvars }}" <<< 'keys(data.terraform_remote_state.k8s.outputs)' > k8s_outputs_keys.txt || true
           cat k8s_outputs_keys.txt
 
-          # valida que não está vazio
           if grep -q '^\[\s*\]$' k8s_outputs_keys.txt; then
             echo "ERROR: k8s remote_state outputs is empty. Check k8s_remote_state_key/bucket/region."
             exit 1
           fi
 
-          # valida que existe pelo menos um dos outputs que você usa
-          # (ajuste se seu infra-k8s exporta nomes diferentes)
           if ! grep -Eq 'cluster_security_group_id|eks_nodes_sg_id' k8s_outputs_keys.txt; then
             echo "ERROR: Expected outputs not found in k8s state (cluster_security_group_id or eks_nodes_sg_id)."
-            echo "Fix: export these outputs in infra-k8s or update infra-banco locals to the real output names."
             exit 1
           fi
 
